@@ -1,0 +1,93 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}Evaluation #{{ evaluation.id }}{% endblock %}
+
+{% block content %}
+  <p><a href="{{ path('lumina_ui_evaluation_index') }}">&larr; All evaluations</a></p>
+
+  <h1>
+    Evaluation #{{ evaluation.id }}
+    <span class="badge badge--{{ evaluation.status.value }}">{{ evaluation.status.label }}</span>
+  </h1>
+
+  <div class="actions">
+    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_json', {id: evaluation.id}) }}">View JSON</a>
+    <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: evaluation.id}) }}">
+      <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ evaluation.id) }}">
+      <button type="submit">Re-run</button>
+    </form>
+  </div>
+
+  <table>
+    <caption>Run details</caption>
+    <tbody>
+      <tr><th scope="row">Patient</th><td>{{ evaluation.patientName ?? '—' }} ({{ links.external(ctomop_url, 'patient/' ~ evaluation.personId, evaluation.personId) }})</td></tr>
+      <tr><th scope="row">Trial</th><td>{{ evaluation.trialId ? links.external(exact_url, 'trials/trial/' ~ evaluation.trialId ~ '/change/', evaluation.trialId) : '—' }}</td></tr>
+      <tr><th scope="row">Disease</th><td>{{ evaluation.disease ?? '—' }}</td></tr>
+      <tr><th scope="row">Software</th><td>{{ evaluation.software.label }}</td></tr>
+      <tr><th scope="row">Kind</th><td>{{ evaluation.kind.label }}</td></tr>
+      {% if evaluation.batch %}
+        <tr><th scope="row">Batch</th>
+          <td><a href="{{ path('lumina_ui_batch_show', {id: evaluation.batch.id}) }}">#{{ evaluation.batch.id }}</a></td></tr>
+      {% endif %}
+      <tr><th scope="row">Exit code</th><td>{{ evaluation.exitCode ?? '—' }}</td></tr>
+      <tr><th scope="row">Created</th><td>{{ evaluation.createdAt|date('Y-m-d H:i:s') }}</td></tr>
+      <tr><th scope="row">Ran at</th>
+        <td>{{ evaluation.ranAt ? evaluation.ranAt|date('Y-m-d H:i:s') : '—' }}
+          {%- if evaluation.durationMs %} <span class="muted">({{ evaluation.durationMs }} ms)</span>{% endif %}</td></tr>
+    </tbody>
+  </table>
+
+  {% if evaluation.summary %}
+    <h2>Summary</h2>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          {% for key, value in evaluation.summary %}
+            <tr><th scope="row">{{ key }}</th><td>{{ value ?? '—' }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if evaluation.attributes %}
+    <h2>Attribute breakdown ({{ evaluation.attributes|length }})</h2>
+    <div class="table-wrap">
+      <table>
+        <caption>CTOMOP-derived attributes for this patient × trial</caption>
+        <thead>
+          <tr>
+            <th scope="col">Attribute</th>
+            <th scope="col">Status</th>
+            <th scope="col">CTOMOP value</th>
+            <th scope="col">Differs?</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attr in evaluation.attributes %}
+            <tr>
+              <td>{{ attr.name }}</td>
+              <td>{{ attr.status }}</td>
+              <td>{{ attr.ctomop ?? '—' }}</td>
+              <td>{{ attr.differs ? 'yes' : 'no' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if evaluation.rawOutput %}
+    <h2>Raw output</h2>
+    <details>
+      <summary>Show captured stdout</summary>
+      <pre>{{ evaluation.rawOutput }}</pre>
+    </details>
+  {% endif %}
+
+  {% if evaluation.command %}
+    <h2>Command</h2>
+    <pre>{{ evaluation.command }}</pre>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}Batch #{{ batch.id }}{% endblock %}
+
+{% block content %}
+  <p><a href="{{ path('lumina_ui_batch_index') }}">&larr; All batches</a></p>
+
+  <h1>
+    Batch #{{ batch.id }}
+    <span class="badge badge--{{ batch.status.value }}">{{ batch.status.label }}</span>
+  </h1>
+
+  <table>
+    <caption>Batch details</caption>
+    <tbody>
+      <tr><th scope="row">Label</th><td>{{ batch.label ?? '—' }}</td></tr>
+      <tr><th scope="row">Software</th><td>{{ batch.software.label }}</td></tr>
+      <tr><th scope="row">Kind</th><td>{{ batch.kind.label }}</td></tr>
+      <tr><th scope="row">Exit code</th><td>{{ batch.exitCode ?? '—' }}</td></tr>
+      <tr><th scope="row">Started</th><td>{{ batch.startedAt ? batch.startedAt|date('Y-m-d H:i:s') : '—' }}</td></tr>
+      <tr><th scope="row">Finished</th>
+        <td>{{ batch.finishedAt ? batch.finishedAt|date('Y-m-d H:i:s') : '—' }}
+          {%- if batch.durationMs %} <span class="muted">({{ batch.durationMs }} ms)</span>{% endif %}</td></tr>
+    </tbody>
+  </table>
+
+  {% if batch.summary %}
+    <h2>Summary</h2>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          {% for key, value in batch.summary %}
+            <tr><th scope="row">{{ key }}</th><td>{{ value ?? '—' }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <h2>Results ({{ batch.evaluations|length }})</h2>
+  {% if batch.evaluations is empty %}
+    <p class="muted">No result rows yet — the batch may still be running.</p>
+  {% else %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Patient</th>
+            <th scope="col">Disease</th>
+            <th scope="col">Total</th>
+            <th scope="col">Eligible</th>
+            <th scope="col">Potential</th>
+            <th scope="col">Best match</th>
+            <th scope="col">Best goodness</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in batch.evaluations %}
+            <tr>
+              <td>{{ e.id }}</td>
+              <td>{{ links.external(ctomop_url, 'patient/' ~ e.personId, e.personId) }}</td>
+              <td>{{ e.disease ?? '—' }}</td>
+              <td>{{ e.summary.total ?? '—' }}</td>
+              <td>{{ e.summary.eligible ?? '—' }}</td>
+              <td>{{ e.summary.potential ?? '—' }}</td>
+              <td>{{ e.summary.bestMatchPercent is defined ? e.summary.bestMatchPercent ~ '%' : '—' }}</td>
+              <td>{{ e.summary.bestGoodness ?? '—' }}</td>
+              <td><a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">View</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if batch.rawOutput %}
+    <h2>Raw output</h2>
+    <details>
+      <summary>Show captured stdout</summary>
+      <pre>{{ batch.rawOutput }}</pre>
+    </details>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% block page_title %}Batches{% endblock %}
+
+{% block content %}
+  <h1>Batches</h1>
+
+  <div class="actions">
+    <form method="post" action="{{ path('lumina_ui_evaluation_run_all') }}"
+          onsubmit="return confirm('Run a trial search for ALL patients in the background?');">
+      <input type="hidden" name="_token" value="{{ csrf_token('run-all') }}">
+      <button type="submit">Run all (search trials)</button>
+    </form>
+  </div>
+
+  {% if batches is empty %}
+    <p class="muted">No batches yet. Queue one with “Run all”.</p>
+  {% else %}
+    <div class="table-wrap">
+      <table>
+        <caption>{{ batches|length }} most recent batch{{ batches|length == 1 ? '' : 'es' }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Label</th>
+            <th scope="col">Software</th>
+            <th scope="col">Status</th>
+            <th scope="col">Results</th>
+            <th scope="col">Created</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in batches %}
+            <tr>
+              <td>{{ b.id }}</td>
+              <td>{{ b.label ?? '—' }}</td>
+              <td>{{ b.software.label }}</td>
+              <td><span class="badge badge--{{ b.status.value }}">{{ b.status.label }}</span></td>
+              <td>{{ b.evaluationCount }}</td>
+              <td><time datetime="{{ b.createdAt|date('c') }}">{{ b.createdAt|date('Y-m-d H:i') }}</time></td>
+              <td><a href="{{ path('lumina_ui_batch_show', {id: b.id}) }}">View</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

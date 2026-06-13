@@ -1,0 +1,31 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% block page_title %}New evaluation{% endblock %}
+
+{% block content %}
+  <h1>New evaluation</h1>
+  <p class="muted">
+    Runs <code>explain_trial_match</code> for one patient against one trial,
+    in the background.
+  </p>
+
+  <form method="post" action="{{ path('lumina_ui_evaluation_new') }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('new-evaluation') }}">
+
+    <div class="field">
+      <label for="person_id">Patient ID (CTOMOP person_id)</label>
+      <input type="number" id="person_id" name="person_id" min="1" required
+             inputmode="numeric" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="trial_id">Trial ID</label>
+      <input type="number" id="trial_id" name="trial_id" min="1" required
+             inputmode="numeric" autocomplete="off">
+    </div>
+
+    <div class="actions">
+      <button type="submit">Queue evaluation</button>
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

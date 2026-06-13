@@ -1,0 +1,21 @@
+{#
+  Reusable cross-app link helper.
+
+  Lumina UI references records that live in OTHER apps in the stack (ctomop for
+  patients, exact for trials). Those apps' base URLs are instance-specific, so
+  they come from the host app as Twig globals (ctomop_url / exact_url). When the
+  relevant base URL is set we render a real external link; when it is not (e.g. a
+  host app that doesn't define it) we fall back to plain text — keeping the
+  bundle portable.
+
+  Usage:
+    {% import '@LuminaUi/_links.html.twig' as links %}
+    {{ links.external(ctomop_url, 'patient/' ~ e.personId, e.personId) }}
+#}
+{% macro external(base_url, path_suffix, label) %}
+  {%- if base_url|default('') is not empty -%}
+    <a href="{{ base_url }}{{ path_suffix }}" rel="noopener noreferrer" target="_blank">{{ label }}</a>
+  {%- else -%}
+    {{ label }}
+  {%- endif -%}
+{% endmacro %}

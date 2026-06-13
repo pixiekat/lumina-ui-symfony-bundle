@@ -1,0 +1,60 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}Evaluations{% endblock %}
+
+{% block content %}
+  <h1>Evaluations</h1>
+
+  <div class="actions">
+    <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+    <form method="post" action="{{ path('lumina_ui_evaluation_run_all') }}"
+          onsubmit="return confirm('Run a trial search for ALL patients in the background?');">
+      <input type="hidden" name="_token" value="{{ csrf_token('run-all') }}">
+      <button type="submit" class="button--secondary">Run all (search trials)</button>
+    </form>
+  </div>
+
+  {% if evaluations is empty %}
+    <p class="muted">No evaluations yet. Create one with “New evaluation”, or queue a batch with “Run all”.</p>
+  {% else %}
+    <div class="table-wrap">
+      <table>
+        <caption>{{ evaluations|length }} most recent evaluation{{ evaluations|length == 1 ? '' : 's' }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Patient</th>
+            <th scope="col">Trial</th>
+            <th scope="col">Software</th>
+            <th scope="col">Kind</th>
+            <th scope="col">Status</th>
+            <th scope="col">Created</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in evaluations %}
+            <tr>
+              <td>{{ e.id }}</td>
+              <td>{{ e.patientName ?? '—' }}
+                <span class="muted">({{ links.external(ctomop_url, 'patient/' ~ e.personId, e.personId) }})</span></td>
+              <td>{{ e.trialId ? links.external(exact_url, 'trials/trial/' ~ e.trialId ~ '/change/', e.trialId) : '—' }}</td>
+              <td>{{ e.software.label }}</td>
+              <td>{{ e.kind.label }}</td>
+              <td><span class="badge badge--{{ e.status.value }}">{{ e.status.label }}</span></td>
+              <td><time datetime="{{ e.createdAt|date('c') }}">{{ e.createdAt|date('Y-m-d H:i') }}</time></td>
+              <td>
+                <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">View</a>
+                · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">JSON</a>
+                <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: e.id}) }}" class="inline">
+                  <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ e.id) }}">
+                  · <button type="submit">Re-run</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -33,6 +33,7 @@ class EvaluationRepository extends ServiceEntityRepository {
     return $this->createQueryBuilder('e')
       ->andWhere('e.batch IS NULL')
       ->orderBy('e.createdAt', 'DESC')
+      ->addOrderBy('e.id', 'DESC')
       ->setMaxResults($limit)
       ->getQuery()
       ->getResult();

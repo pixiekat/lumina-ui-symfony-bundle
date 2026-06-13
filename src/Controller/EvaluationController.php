@@ -38,13 +38,20 @@ class EvaluationController extends AbstractController {
     private readonly MessageBusInterface $bus,
   ) {}
 
-  /** The landing page: a table of the most recent evaluations. */
+  /** The landing page: a paginated table of standalone evaluations. */
   #[Route('/', name: 'lumina_ui_evaluation_index', methods: ['GET'])]
-  public function index(): Response {
-    // ctomop_url / exact_url are Twig globals (see config/packages/twig.yaml),
-    // so they don't need passing here.
+  public function index(Request $request): Response {
+    $perPage = 25;
+    $page = max(1, $request->query->getInt('page', 1));
+    $paginator = $this->evaluations->paginateStandalone($page, $perPage);
+    $total = count($paginator);
+
+    // ctomop_url / exact_url are Twig globals (see config/packages/twig.yaml).
     return $this->render('@LuminaUi/evaluation/index.html.twig', [
-      'evaluations' => $this->evaluations->findLatest(),
+      'evaluations' => $paginator,
+      'page' => $page,
+      'pages' => max(1, (int) ceil($total / $perPage)),
+      'total' => $total,
     ]);
   }
 

@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Pixiekat\LuminaUiBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 use Pixiekat\LuminaUiBundle\Entity\Evaluation;
 
@@ -20,23 +21,29 @@ class EvaluationRepository extends ServiceEntityRepository {
   }
 
   /**
-   * Most-recent-first list of STANDALONE evaluations for the index table.
+   * One page of STANDALONE evaluations, most-recent-first, for the index table.
    *
    * Batch-produced rows (those with a batch set) are excluded — they're shown
    * grouped under their batch on /batches/{id}, so the main Evaluations list
    * stays focused on directly-run evaluations rather than being flooded by a
    * single "Run all" of 100+ patients.
    *
-   * @return Evaluation[]
+   * Returns a Doctrine Paginator (Countable + iterable): count($paginator) is the
+   * grand total across all pages; iterating yields only this page's rows.
    */
-  public function findLatest(int $limit = 100): array {
-    return $this->createQueryBuilder('e')
+  public function paginateStandalone(int $page, int $perPage = 25): Paginator {
+    $page = max(1, $page);
+
+    $query = $this->createQueryBuilder('e')
       ->andWhere('e.batch IS NULL')
       ->orderBy('e.createdAt', 'DESC')
       ->addOrderBy('e.id', 'DESC')
-      ->setMaxResults($limit)
-      ->getQuery()
-      ->getResult();
+      ->setFirstResult(($page - 1) * $perPage)
+      ->setMaxResults($perPage)
+      ->getQuery();
+
+    // No to-many joins in the query, so the cheaper count strategy is safe.
+    return new Paginator($query, fetchJoinCollection: false);
   }
 
   /** Persist + flush a single evaluation. Small convenience for handlers/controllers. */

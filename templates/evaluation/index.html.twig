@@ -14,12 +14,12 @@
     </form>
   </div>
 
-  {% if evaluations is empty %}
+  {% if total == 0 %}
     <p class="muted">No evaluations yet. Create one with “New evaluation”, or queue a batch with “Run all”.</p>
   {% else %}
     <div class="table-wrap">
       <table>
-        <caption>{{ evaluations|length }} most recent evaluation{{ evaluations|length == 1 ? '' : 's' }}</caption>
+        <caption>{{ total }} evaluation{{ total == 1 ? '' : 's' }} · page {{ page }} of {{ pages }}</caption>
         <thead>
           <tr>
             <th scope="col">#</th>
@@ -56,5 +56,21 @@
         </tbody>
       </table>
     </div>
+
+    {% if pages > 1 %}
+      <nav class="pagination" aria-label="Evaluations pages">
+        {% if page > 1 %}
+          <a href="{{ path('lumina_ui_evaluation_index', {page: page - 1}) }}" rel="prev">← Previous</a>
+        {% else %}
+          <span class="muted" aria-hidden="true">← Previous</span>
+        {% endif %}
+        <span>Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}
+          <a href="{{ path('lumina_ui_evaluation_index', {page: page + 1}) }}" rel="next">Next →</a>
+        {% else %}
+          <span class="muted" aria-hidden="true">Next →</span>
+        {% endif %}
+      </nav>
+    {% endif %}
   {% endif %}
 {% endblock %}

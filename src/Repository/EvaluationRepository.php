@@ -20,12 +20,18 @@ class EvaluationRepository extends ServiceEntityRepository {
   }
 
   /**
-   * Most-recent-first list for the index table.
+   * Most-recent-first list of STANDALONE evaluations for the index table.
+   *
+   * Batch-produced rows (those with a batch set) are excluded — they're shown
+   * grouped under their batch on /batches/{id}, so the main Evaluations list
+   * stays focused on directly-run evaluations rather than being flooded by a
+   * single "Run all" of 100+ patients.
    *
    * @return Evaluation[]
    */
   public function findLatest(int $limit = 100): array {
     return $this->createQueryBuilder('e')
+      ->andWhere('e.batch IS NULL')
       ->orderBy('e.createdAt', 'DESC')
       ->setMaxResults($limit)
       ->getQuery()

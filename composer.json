@@ -1,0 +1,24 @@
+{
+    "name": "pixiekat/lumina-ui-symfony-bundle",
+    "description": "Lumina UI — Symfony bundle that owns the evaluation entities, Doctrine migrations and controllers for trial-matching runs (EXACT / MatchMiner).",
+    "type": "symfony-bundle",
+    "license": "proprietary",
+    "keywords": ["lumina", "symfony-bundle", "clinical-trials", "evaluation"],
+    "require": {
+        "php": ">=8.4",
+        "symfony/framework-bundle": "^8.1",
+        "doctrine/orm": "^3.6",
+        "doctrine/doctrine-bundle": "^3.2",
+        "doctrine/doctrine-migrations-bundle": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Pixiekat\\LuminaUiBundle\\": "src/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1-dev"
+        }
+    }
+}

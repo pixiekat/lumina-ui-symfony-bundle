@@ -7,6 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationKind;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationStatus;
 use Pixiekat\LuminaUiBundle\Enum\MatchingSoftware;
+use Pixiekat\LuminaUiBundle\Repository\EvaluationRepository;
 use Pixiekat\SymfonyHelpers\Traits\Entity as PixieTraits;
 
 /**
@@ -37,10 +38,9 @@ use Pixiekat\SymfonyHelpers\Traits\Entity as PixieTraits;
  * HasLifecycleCallbacks lets EntityCreatedAtTrait::setCreatedAtValue (PrePersist)
  * and EntityUpdatedAtTrait::setUpdatedAtValue (PreUpdate) fire automatically.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: EvaluationRepository::class)]
 #[ORM\Table(name: 'lumina_evaluation')]
 #[ORM\Index(name: 'idx_eval_person', columns: ['person_id'])]
-#[ORM\Index(name: 'idx_eval_batch', columns: ['batch_key'])]
 #[ORM\HasLifecycleCallbacks]
 class Evaluation {
   use PixieTraits\EntityIdTrait;
@@ -103,9 +103,14 @@ class Evaluation {
   #[ORM\Column(nullable: true)]
   private ?int $exitCode = null;
 
-  /** Groups the rows created by a single "run all" invocation. */
-  #[ORM\Column(name: 'batch_key', length: 64, nullable: true)]
-  private ?string $batchKey = null;
+  /**
+   * Parent batch when this row was produced by a "run all" invocation.
+   * Null for one-off single evaluations. onDelete SET NULL keeps the result
+   * row around even if its batch record is later deleted.
+   */
+  #[ORM\ManyToOne(targetEntity: EvaluationBatch::class, inversedBy: 'evaluations')]
+  #[ORM\JoinColumn(name: 'batch_id', nullable: true, onDelete: 'SET NULL')]
+  private ?EvaluationBatch $batch = null;
 
   /** When the background run actually finished. Null while pending/running. */
   #[ORM\Column(nullable: true)]
@@ -224,12 +229,12 @@ class Evaluation {
     return $this;
   }
 
-  public function getBatchKey(): ?string {
-    return $this->batchKey;
+  public function getBatch(): ?EvaluationBatch {
+    return $this->batch;
   }
 
-  public function setBatchKey(?string $batchKey): static {
-    $this->batchKey = $batchKey;
+  public function setBatch(?EvaluationBatch $batch): static {
+    $this->batch = $batch;
     return $this;
   }
 

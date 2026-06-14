@@ -46,8 +46,7 @@ class EvaluationBatch {
   private EvaluationStatus $status = EvaluationStatus::Pending;
 
   /** Optional human label, e.g. "Run all — breast cancer cohort". */
-  #[ORM\Column(length: 255, nullable: true)]
-  private ?string $label = null;
+  use PixieTraits\EntityLabelTrait;
 
   /** The shell command used, for audit + re-run. */
   #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -109,15 +108,6 @@ class EvaluationBatch {
 
   public function setStatus(EvaluationStatus $status): static {
     $this->status = $status;
-    return $this;
-  }
-
-  public function getLabel(): ?string {
-    return $this->label;
-  }
-
-  public function setLabel(?string $label): static {
-    $this->label = $label;
     return $this;
   }
 

@@ -122,6 +122,7 @@ class EvaluationController extends AbstractController {
       'personId'   => $evaluation->getPersonId(),
       'trialId'    => $evaluation->getTrialId(),
       'status'     => $evaluation->getStatus()->value,
+      'ran_at'     => $evaluation->getRanAt() ? $evaluation->getRanAt()->format(\DateTimeInterface::ATOM) : null,
       'created_at' => $evaluation->getCreatedAt() ? $evaluation->getCreatedAt()->format(\DateTimeInterface::ATOM) : null,
       'updated_at' => $evaluation->getUpdatedAt() ? $evaluation->getUpdatedAt()->format(\DateTimeInterface::ATOM) : null,
       'summary'    => $evaluation->getSummary(),

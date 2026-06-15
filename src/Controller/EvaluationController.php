@@ -46,7 +46,6 @@ class EvaluationController extends AbstractController {
     $paginator = $this->evaluations->paginateStandalone($page, $perPage);
     $total = count($paginator);
 
-    // ctomop_url / exact_url are Twig globals (see config/packages/twig.yaml).
     return $this->render('@LuminaUi/evaluation/index.html.twig', [
       'evaluations' => $paginator,
       'page' => $page,

@@ -24,9 +24,11 @@ class ExactCommandRunner {
   ) {}
 
   /**
-   * @param string[] $args e.g. ['explain_trial_match', '--person-id', '1097', '--trial-id', '24660']
+   * Runs the command and returns a structured result.
    *
-   * @return array{command: string, exitCode: int, stdout: string, stderr: string, durationMs: int}
+   * @param array $args The `manage.py` subcommand and its arguments.
+   * @param integer $timeoutSeconds How long to wait for the command to finish.
+   * @return array
    */
   public function run(array $args, int $timeoutSeconds = 600): array {
     $argv = array_merge(['docker', 'exec', $this->container, $this->python, 'manage.py'], $args);

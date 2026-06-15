@@ -1,7 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Pixiekat\LuminaUiBundle\Enum;
 
 /**
@@ -15,21 +13,27 @@ namespace Pixiekat\LuminaUiBundle\Enum;
  * The UI uses this to show a status badge and to decide whether a "re-run"
  * link is offered.
  */
-enum EvaluationStatus: string
-{
-    case Pending = 'pending';
-    case Running = 'running';
-    case Completed = 'completed';
-    case Failed = 'failed';
+enum EvaluationStatus: string {
+  case Pending = 'pending';
+  case Running = 'running';
+  case Completed = 'completed';
+  case Failed = 'failed';
 
-    public function label(): string
-    {
-        return ucfirst($this->value);
-    }
+  /**
+   * The human readable label for this status.
+   *
+   * @return string
+   */
+  public function label(): string {
+    return ucfirst($this->value);
+  }
 
-    /** True when the run has reached a final state (no longer in flight). */
-    public function isTerminal(): bool
-    {
-        return $this === self::Completed || $this === self::Failed;
-    }
+  /**
+   * Checks whether the status is a final state and no longer in flight.
+   *
+   * @return boolean
+   */
+  public function isTerminal(): bool {
+    return $this === self::Completed || $this === self::Failed;
+  }
 }

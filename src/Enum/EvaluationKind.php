@@ -17,22 +17,24 @@ namespace Pixiekat\LuminaUiBundle\Enum;
  *   - explain_trial_match: ONE patient × ONE trial, with a per-attribute breakdown.
  *   - search_trials_for_patients: a summary row PER patient (counts + best scores).
  */
-enum EvaluationKind: string
-{
-    case ExplainTrialMatch = 'explain_trial_match';
-    case SearchTrials = 'search_trials_for_patients';
+enum EvaluationKind: string {
+  case ExplainTrialMatch = 'explain_trial_match';
+  case SearchTrials = 'search_trials_for_patients';
 
-    public function label(): string
-    {
-        return match ($this) {
-            self::ExplainTrialMatch => 'Explain trial match',
-            self::SearchTrials => 'Search trials for patient',
-        };
-    }
+  public function label(): string {
+    return match ($this) {
+      self::ExplainTrialMatch => 'Explain trial match',
+      self::SearchTrials => 'Search trials for patient',
+    };
+  }
 
-    /** True when this kind is scoped to a single trial (needs --trial-id). */
-    public function requiresTrial(): bool
-    {
-        return $this === self::ExplainTrialMatch;
-    }
+  /**
+   * Determines whether or not the selected evaluation kind requires a trial argument
+   *   (e.g. --trial-id)
+   *
+   * @return boolean True when this kind is scoped to a single trial.
+   */
+  public function requiresTrial(): bool {
+    return $this === self::ExplainTrialMatch;
+  }
 }

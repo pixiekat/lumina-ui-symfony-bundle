@@ -1,7 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Pixiekat\LuminaUiBundle\Enum;
 
 /**
@@ -11,17 +9,21 @@ namespace Pixiekat\LuminaUiBundle\Enum;
  * through Doctrine's `enumType` mapping. Add new engines here as they come
  * online (the EXACT container exists today; MatchMiner is planned).
  */
-enum MatchingSoftware: string
-{
-    case Exact = 'exact';
-    case MatchMiner = 'matchminer';
+enum MatchingSoftware: string {
+  case Exact = 'exact';
+  case MatchMiner = 'matchminer';
+  case TrialGPT = 'trialgpt';
 
-    /** Human-friendly label for templates / dropdowns. */
-    public function label(): string
-    {
-        return match ($this) {
-            self::Exact => 'EXACT',
-            self::MatchMiner => 'MatchMiner',
-        };
-    }
+  /**
+   * The human readable label for the matching software.
+   *
+   * @return string
+   */
+  public function label(): string {
+    return match ($this) {
+      self::Exact => 'EXACT',
+      self::MatchMiner => 'MatchMiner',
+      self::TrialGPT => 'TrialGPT',
+    };
+  }
 }

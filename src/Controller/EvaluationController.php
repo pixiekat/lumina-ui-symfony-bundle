@@ -55,6 +55,24 @@ class EvaluationController extends AbstractController {
     ]);
   }
 
+  /** Deletes an evaluation. */
+  #[Route('/evaluations/{id}', name: 'lumina_ui_evaluation_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+  public function delete(int $id, Request $request): Response {
+    $evaluation = $this->findEvaluationOr404($id);
+
+    if (!$this->isCsrfTokenValid('delete-evaluation', (string) $request->request->get('_token'))) {
+      $this->addFlash('error', 'Invalid security token — please try again.');
+      return $this->redirectToRoute('lumina_ui_evaluation_show', ['id' => $evaluation->getId()]);
+    }
+
+    $this->em->remove($evaluation);
+    $this->em->flush();
+
+    $this->addFlash('success', sprintf('Evaluation #%d deleted.', $evaluation->getId()));
+
+    return $this->redirectToRoute('lumina_ui_evaluation_index');
+  }
+
   /** Create a one-off explain_trial_match evaluation (person × trial). */
   #[Route('/evaluations/new', name: 'lumina_ui_evaluation_new', methods: ['GET', 'POST'])]
   public function new(Request $request): Response {

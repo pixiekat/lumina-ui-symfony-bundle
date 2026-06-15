@@ -50,6 +50,10 @@
                   <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ e.id) }}">
                   · <button type="submit">Re-run</button>
                 </form>
+                <form method="post" action="{{ path('lumina_ui_evaluation_delete', {id: e.id}) }}" class="inline">
+                  <input type="hidden" name="_token" value="{{ csrf_token('delete-evaluation') }}">
+                  · <button type="submit" onclick="return confirm('Delete this evaluation?');">Delete</button>
+                </form>
               </td>
             </tr>
           {% endfor %}

@@ -54,8 +54,8 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header>
     <nav aria-label="Primary">
-      <a href="{{ path('lumina_ui_evaluation_index') }}">Evaluations</a>
-      <a href="{{ path('lumina_ui_batch_index') }}">Batches</a>
+      <a href="{{ path('lumina_ui_evaluation_index') }}">Run Evaluation on Patients</a>
+      <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a>
       {% if exact_url is defined %}
         <a href="{{ exact_url }}" rel="noopener noreferrer" target="_blank">Exact Admin (external)</a>
       {% endif %}
@@ -65,9 +65,10 @@
     </nav>
   </header>
   <main id="main">
-    {% for label, messages in app.flashes(['success', 'error']) %}
+    {% for label, messages in app.flashes(['success', 'error', 'info', 'danger']) %}
       {% for message in messages %}
-        <p class="flash flash--{{ label }}" role="{{ label == 'error' ? 'alert' : 'status' }}">{{ message }}</p>
+        {% set type = label == 'error' ? 'alert' : 'status' %}
+        <p class="flash flash--{{ label }}" role="{{ type }}">{{ message }}</p>
       {% endfor %}
     {% endfor %}
     {% block content %}{% endblock %}

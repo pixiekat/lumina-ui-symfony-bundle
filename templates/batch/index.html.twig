@@ -2,13 +2,14 @@
 {% block page_title %}Batches{% endblock %}
 
 {% block content %}
-  <h1>Batches</h1>
+  <h1><code>search_trials_for_patients</code> Runs</h1>
+  <p>Uses <code>search_trials_for_patients</code> to queue a batch of trial searches for all patients in the database, and returns a list of patient goodness score, potentially, and eligibility information.</p>
 
   <div class="actions">
     <form method="post" action="{{ path('lumina_ui_evaluation_run_all') }}"
-          onsubmit="return confirm('Run a trial search for ALL patients in the background?');">
+          onsubmit="return confirm('Run search_trials_for_patients for ALL patients in the background?');">
       <input type="hidden" name="_token" value="{{ csrf_token('run-all') }}">
-      <button type="submit">Run all (search trials)</button>
+      <button type="submit">Run search_trials_for_patients</button>
     </form>
   </div>
 

@@ -1,0 +1,16 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+
+{% block title %}Edit User{% endblock %}
+
+{% block body %}
+  <h1>Editing User: {{ user.getDisplayName() }}</h1>
+
+  <div data-turbo="false">
+    <a href="{{ path('admin_users_list') }}">&larr; Back to Users List</a>
+    {{ form_start(form) }}
+      {{ form_widget(form) }}
+      <button type="submit">Save Changes</button>
+    {{ form_end(form) }}
+  </div>
+{% endblock %}

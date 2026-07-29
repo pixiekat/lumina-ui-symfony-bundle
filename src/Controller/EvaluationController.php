@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Pixiekat\LuminaUiBundle\Controller;
 
+use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
 use Doctrine\ORM\EntityManagerInterface;
 use Pixiekat\LuminaUiBundle\Entity\Evaluation;
 use Pixiekat\LuminaUiBundle\Entity\EvaluationBatch;
@@ -17,6 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * The Lumina UI screens for evaluations and batches.
@@ -29,6 +31,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Forms are plain HTML POSTs so everything works with JavaScript disabled;
  * Turbo, if loaded, progressively enhances navigation without being required.
  */
+#[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_ACCESS_EVALUATIONS)]
 class EvaluationController extends AbstractController {
 
   public function __construct(

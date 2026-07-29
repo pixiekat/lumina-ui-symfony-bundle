@@ -1,0 +1,25 @@
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+
+{% block body %}
+  {% if error %}
+    <div>{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+  {% endif %}
+
+  <div class="container">
+    <div class="row">
+      <div class="col">
+        <h1>Login</h1>
+        <p>Login to your accountasdasdasd</p>
+
+        <div data-turbo="false">
+            {{ form_start(form) }}
+            {{ form_row(form._username) }}
+            {{ form_row(form._password) }}
+            {{ form_rest(form) }}
+            {{ form_end(form, {'render_rest': false}) }}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

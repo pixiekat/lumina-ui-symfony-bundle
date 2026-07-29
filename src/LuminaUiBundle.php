@@ -47,4 +47,47 @@ final class LuminaUiBundle extends AbstractBundle
     {
         $container->import(\dirname(__DIR__) . '/config/services.php');
     }
+
+    /**
+     * Let this bundle override templates that ship in *other* bundles.
+     *
+     * The familiar `templates/bundles/<BundleName>/` convention is deliberately
+     * application-only: Symfony resolves it against %kernel.project_dir%/templates
+     * and nowhere else, so a bundle can never use it to override a sibling. To
+     * make an override travel with this bundle (and therefore apply to every app
+     * that boots it) we have to register the directory as a Twig path ourselves.
+     *
+     * How the priority works: Twig's FilesystemLoader keeps an ordered list of
+     * directories per namespace and returns the first file it finds. Paths coming
+     * from `twig.paths` config are added before the ones TwigBundle derives from
+     * registered bundles, and prependExtensionConfig() puts our config ahead of
+     * the host application's twig.yaml. Net effect: the directory below is searched
+     * before symfony-common-helpers' own templates/ dir, so our copy wins.
+     *
+     * The layout beneath the directory must mirror the target bundle exactly —
+     * '@PixiekatSymfonyHelpers/user/login.html.twig' looks for 'user/login.html.twig'
+     * inside whatever directories are registered under that namespace.
+     */
+    public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
+    {
+        $overrides = [
+            // <directory shipped in this bundle> => <namespace of the bundle being overridden>
+            '/templates/bundles/PixiekatSymfonyHelpersBundle' => 'PixiekatSymfonyHelpers',
+        ];
+
+        foreach ($overrides as $relativePath => $namespace) {
+            $path = \dirname(__DIR__) . $relativePath;
+
+            // FilesystemLoader::addPath() throws if a directory is missing, which
+            // would take the whole container down. Skipping absent directories keeps
+            // an override optional rather than mandatory.
+            if (!is_dir($path)) {
+                continue;
+            }
+
+            $builder->prependExtensionConfig('twig', [
+                'paths' => [$path => $namespace],
+            ]);
+        }
+    }
 }

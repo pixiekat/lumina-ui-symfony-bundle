@@ -61,7 +61,6 @@
             <th scope="col">Attribute</th>
             <th scope="col">Status</th>
             <th scope="col">CTOMOP value</th>
-            <th scope="col">Differs?</th>
           </tr>
         </thead>
         <tbody>
@@ -70,7 +69,7 @@
               <td>{{ attr.name }}</td>
               <td>{{ attr.status }}</td>
               <td>{{ attr.ctomop ?? '—' }}</td>
-              <td>{{ attr.differs ? 'yes' : 'no' }}</td>
+              <!--<td>{{ attr.differs ? 'yes' : 'no' }}</td>-->
             </tr>
           {% endfor %}
         </tbody>

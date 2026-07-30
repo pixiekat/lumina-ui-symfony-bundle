@@ -47,6 +47,25 @@
     .field label { display:block; font-weight:600; margin-bottom:.25rem; }
     .field input { font:inherit; padding:.45rem .6rem; width:100%; border:1px solid var(--line); border-radius:.4rem; }
     .pagination { display:flex; gap:1rem; align-items:center; margin:1rem 0; }
+    /* Visible to screen readers, invisible on screen. Used to give repeated
+       controls ("Queue", "Select") a distinguishable accessible name — a list of
+       thirty identically-named buttons is unusable in a screen reader. Clip
+       rather than display:none, which would remove it from the a11y tree too. */
+    .visually-hidden { position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+                       overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; border:0; }
+    .trial-summary { border:1px solid var(--line); border-radius:.4rem; padding:1rem; margin:0 0 1.25rem; }
+    .trial-summary h2 { font-size:1.15rem; margin:0 0 .75rem; }
+    /* Auto-fit rather than a fixed column count, so the definition list reflows
+       to one column on a narrow screen instead of overflowing. */
+    .trial-meta { display:grid; grid-template-columns:repeat(auto-fit, minmax(12rem, 1fr));
+                  gap:.5rem 1.5rem; margin:0; }
+    .trial-meta dt { font-weight:600; font-size:.85rem; color:var(--muted); }
+    .trial-meta dd { margin:0; }
+    .status-summary { margin:0 0 .75rem; }
+    /* Zebra striping helps eyes track across a wide row; kept subtle enough not
+       to fight the hover state or the badge colours. */
+    tbody tr:nth-child(even) { background:#fafafa; }
+    tbody tr:hover { background:#f5f7ff; }
   </style>
 {% endblock %}
 
@@ -54,7 +73,7 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header>
     <nav aria-label="Primary">
-      <a href="{{ path('lumina_ui_evaluation_index') }}">Run Evaluation on Patients</a>
+      <a href="{{ path('lumina_ui_evaluation_index') }}">Evaluations</a>
       <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a>
       {% if exact_url is defined %}
         <a href="{{ exact_url }}" rel="noopener noreferrer" target="_blank">Exact Admin (external)</a>

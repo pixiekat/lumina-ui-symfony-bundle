@@ -8,6 +8,7 @@
         "php": ">=8.4",
         "symfony/framework-bundle": "^8.1",
         "doctrine/orm": "^3.6",
+        "doctrine/dbal": "^4.4",
         "doctrine/doctrine-bundle": "^3.2",
         "doctrine/doctrine-migrations-bundle": "^4.0"
     },

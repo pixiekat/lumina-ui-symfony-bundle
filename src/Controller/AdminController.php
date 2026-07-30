@@ -5,12 +5,15 @@ namespace Pixiekat\LuminaUiBundle\Controller;
 use Doctrine\ORM\EntityManagerInterface;
 use Pixiekat\LuminaUiBundle\Entity;
 use Pixiekat\LuminaUiBundle\Form;
+use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_ACCESS_ADMIN_PANEL)]
 #[Route('/admin')]
 final class AdminController extends AbstractController {
 

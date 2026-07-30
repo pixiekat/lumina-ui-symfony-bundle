@@ -13,4 +13,7 @@ interface GenericVoterInterface {
   // determines whether or not a user can run evaluations.
   public const CAN_RUN_EVALUATIONS = 'CAN_RUN_EVALUATIONS';
 
+  // determines whether or not a user can access the admin panel.
+  public const CAN_ACCESS_ADMIN_PANEL = 'CAN_ACCESS_ADMIN_PANEL';
+
 }

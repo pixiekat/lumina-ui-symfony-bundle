@@ -32,6 +32,7 @@ class GenericVoter extends PixieHelperSecurity\Voter\BaseVoter implements Interf
     return match($attribute) {
         self::CAN_ACCESS_EVALUATIONS => $this->security->isGranted('ROLE_EVALUATOR') || $this->security->isGranted('ROLE_ADMIN'),
         self::CAN_RUN_EVALUATIONS => $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_ACCESS_ADMIN_PANEL => $this->security->isGranted('ROLE_ADMIN'),
         self::CAN_LOG_IN => $this->canLogIn($user),
         default => false,
     };

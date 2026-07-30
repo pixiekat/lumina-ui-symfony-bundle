@@ -89,5 +89,58 @@ final class LuminaUiBundle extends AbstractBundle
                 'paths' => [$path => $namespace],
             ]);
         }
+
+        $this->prependStimulusControllerPath($builder);
+    }
+
+    /**
+     * Let the Stimulus controllers this bundle ships be discovered.
+     *
+     * StimulusBundle scans `stimulus.controller_paths`, which defaults to the
+     * application's assets/controllers directory and nothing else. Left alone,
+     * that would force every bundle-owned controller to be copied into the host
+     * app — precisely the split this bundle exists to avoid, since the JS is as
+     * much a part of the evaluation feature as the Twig and the PHP.
+     *
+     * Appending our own directory keeps the whole feature in one repository. The
+     * files themselves live under Resources/public/, which Symfony's AssetMapper
+     * maps automatically for every registered bundle (as `bundles/luminaui/…`) —
+     * so they are both discoverable as controllers and servable as assets with
+     * no configuration in the host app at all.
+     *
+     * ── Why the app's own directory is listed here too ──────────────────────
+     * `controller_paths` DEFAULTS to ['%kernel.project_dir%/assets/controllers'],
+     * and a default only applies when nothing supplies a value. The moment we
+     * prepend ours, that default stops applying — so listing only the bundle's
+     * directory would silently stop the host application's own controllers from
+     * being discovered at all. (Here that would have taken out
+     * csrf_protection_controller.js, which is not a cosmetic loss.) Restating the
+     * conventional path alongside ours preserves it.
+     *
+     * If the host app configures `stimulus.controller_paths` explicitly, its
+     * config merges with this one and the shared entry appears twice; harmless,
+     * because the controllers map is keyed by name.
+     */
+    private function prependStimulusControllerPath(ContainerBuilder $builder): void
+    {
+        $paths = [
+            // The host app's conventional directory — see the note above.
+            $builder->getParameter('kernel.project_dir') . '/assets/controllers',
+            // This bundle's own controllers.
+            \dirname(__DIR__) . '/Resources/public/controllers',
+        ];
+
+        // StimulusBundle hands these straight to Finder::in(), which throws on a
+        // missing directory. Filtering keeps an absent directory from taking the
+        // whole container down at compile time.
+        $paths = array_values(array_filter($paths, is_dir(...)));
+
+        if ($paths === []) {
+            return;
+        }
+
+        $builder->prependExtensionConfig('stimulus', [
+            'controller_paths' => $paths,
+        ]);
     }
 }

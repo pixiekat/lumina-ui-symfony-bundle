@@ -1,0 +1,169 @@
+{#
+  The patient queue table for one trial.
+
+  Extracted into its own partial for two reasons: pass 2 renders exactly this
+  fragment inside a <turbo-frame> to poll for status changes, and keeping it
+  separate means the polled markup and the first-render markup can never drift
+  apart. There is one source of truth for a row.
+
+  Expects: trial, patients, latest (evaluations keyed by person_id), counts,
+           hasActive.
+
+  ── The rule this table follows ──────────────────────────────────────────────
+  A row's action is DERIVED from the data, never remembered by the browser:
+
+      no evaluation          → offer "Queue"
+      pending / running      → show the status, offer nothing
+      completed / failed     → show the status, offer "Re-run"
+
+  That is why the button genuinely disappears after queueing and stays gone
+  across a refresh, a back-navigation, or someone else queueing the same patient
+  in another tab. Disabling a button in JavaScript would come undone on reload;
+  this cannot.
+#}
+{#
+  data-active is the poller's stop signal, and it is deliberately INSIDE the
+  frame: Turbo replaces a frame's children, never the frame element's own
+  attributes, so a flag on the wrapper would freeze at its first-render value and
+  the loop would never terminate. Living here, it is re-read after every refresh
+  and the server stays the authority on whether work is outstanding.
+#}
+<div class="status-summary"
+     data-evaluation-poll-target="state"
+     data-active="{{ hasActive ? 'true' : 'false' }}">
+  {#
+    ONE polite live region for the whole table, not one per cell. A screen reader
+    announcing a hundred individually-changing status cells is unusable noise; a
+    single sentence that says what changed is genuinely useful. Pass 2's poller
+    replaces this element's contents, and the announcement follows for free.
+  #}
+  <p aria-live="polite" aria-atomic="true" class="muted">
+    {% if counts.queued == 0 %}
+      No evaluations queued for this trial yet.
+    {% else %}
+      {{ counts.queued }} of {{ patients|length }} patient{{ patients|length == 1 ? '' : 's' }} queued ·
+      {{ counts.active }} in progress ·
+      {{ counts.completed }} completed{% if counts.failed > 0 %} · {{ counts.failed }} failed{% endif %}.
+    {% endif %}
+  </p>
+
+  {#
+    Bulk queue. Lives inside the frame, next to the counts it depends on, so the
+    number on the button stays truthful as rows are queued elsewhere rather than
+    going stale at whatever it was when the page first loaded.
+
+    Only ever queues patients with NO evaluation yet — never re-runs a finished
+    one. That keeps the button safe to press twice: the second press finds
+    nothing remaining and says so.
+  #}
+  {% if remaining > 0 %}
+    <form method="post" action="{{ path('lumina_ui_evaluation_queue_all') }}"
+          onsubmit="return confirm('Queue evaluations for {{ remaining }} patient{{ remaining == 1 ? '' : 's' }} against this trial?');">
+      <input type="hidden" name="_token" value="{{ csrf_token('queue-all-' ~ trial.id) }}">
+      <input type="hidden" name="trial_id" value="{{ trial.id }}">
+      <button type="submit">
+        Queue all {{ remaining }} remaining patient{{ remaining == 1 ? '' : 's' }}
+      </button>
+      {# The confirm() above is an enhancement, not a guard — with JavaScript off
+         it simply does not fire and the form posts. The action is idempotent in
+         the ways that matter, so that is an acceptable trade rather than a hole. #}
+    </form>
+  {% elseif patients is not empty %}
+    <p class="muted">Every patient has an evaluation for this trial. Use “Re-run” on a row to run one again.</p>
+  {% endif %}
+</div>
+
+{% if patients is empty %}
+  <p class="muted">
+    No patients found. Check that the patient database is reachable and that
+    <code>PATIENT_DATABASE_URL</code> is set correctly.
+  </p>
+{% else %}
+  <div class="table-wrap">
+    <table>
+      <caption>
+        {{ patients|length }} patient{{ patients|length == 1 ? '' : 's' }} ·
+        queue each one against {{ trial.studyId ?? ('trial ' ~ trial.id) }}
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Patient</th>
+          <th scope="col">Age</th>
+          <th scope="col">Condition</th>
+          <th scope="col">ECOG</th>
+          <th scope="col">Status</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for patient in patients %}
+          {% set evaluation = latest[patient.personId] ?? null %}
+          {# The id is the redirect target after queueing, so the browser puts
+             you back on this row instead of the top of the page. #}
+          <tr id="patient-{{ patient.personId }}">
+            <th scope="row">
+              {{ patient.displayName }}
+              <span class="muted">({{ patient.personId }})</span>
+            </th>
+
+            <td>
+              {% set age = patient.approximateAge %}
+              {# "approx." is not padding: with only a birth year we can be a year
+                 out, and a clinical screen should not imply precision it lacks. #}
+              {{ age is null ? '—' : 'approx. ' ~ age }}
+            </td>
+
+            <td>
+              {% if patient.hasClinicalSummary %}
+                {{ patient.disease ?? '—' }}{% if patient.stage %} · stage {{ patient.stage }}{% endif %}
+              {% else %}
+                <span class="muted">No clinical data recorded</span>
+              {% endif %}
+            </td>
+
+            {# ECOG 0 is a real, meaningful score ("fully active") — test for null
+               explicitly so it never renders as an em dash. #}
+            <td>{{ patient.ecogPerformanceStatus is null ? '—' : patient.ecogPerformanceStatus }}</td>
+
+            <td>
+              {% if evaluation is null %}
+                <span class="muted">Not queued</span>
+              {% else %}
+                {# The badge carries the word, not just a colour — colour alone
+                   fails for colour-blind users and in high-contrast modes. #}
+                <span class="badge badge--{{ evaluation.status.value }}">{{ evaluation.status.label }}</span>
+                <a href="{{ path('lumina_ui_evaluation_show', {id: evaluation.id}) }}">
+                  <span class="visually-hidden">View evaluation for {{ patient.displayName }}, </span>#{{ evaluation.id }}
+                </a>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if evaluation is null or evaluation.status.isTerminal %}
+                <form method="post" action="{{ path('lumina_ui_evaluation_queue') }}" class="inline">
+                  {# Token scoped to this trial AND this patient, so a form cannot
+                     be replayed against a different row. #}
+                  <input type="hidden" name="_token"
+                         value="{{ csrf_token('queue-' ~ trial.id ~ '-' ~ patient.personId) }}">
+                  <input type="hidden" name="trial_id" value="{{ trial.id }}">
+                  <input type="hidden" name="person_id" value="{{ patient.personId }}">
+                  <button type="submit">
+                    {{ evaluation is null ? 'Queue' : 'Re-run' }}
+                    {# Thirty buttons all named "Queue" are impossible to tell
+                       apart in a screen reader's element list. #}
+                    <span class="visually-hidden">evaluation for {{ patient.displayName }}</span>
+                  </button>
+                </form>
+              {% else %}
+                <span class="muted">
+                  Queued
+                  <span class="visually-hidden">— no action available for {{ patient.displayName }} while it runs</span>
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

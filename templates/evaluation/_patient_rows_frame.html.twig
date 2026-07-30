@@ -1,0 +1,29 @@
+{#
+  The polling wrapper around the patient queue table.
+
+  Rendered in BOTH places that show the table — inline from new.html.twig on
+  first load, and on its own from the rows endpoint on every poll — so the
+  server-rendered markup and the refreshed markup are byte-for-byte the same
+  template. There is no "initial version" and "updated version" to drift apart.
+
+  Expects everything _patient_rows.html.twig expects, plus `trial`.
+
+  ── target="_top" is doing real work here ────────────────────────────────────
+  By default every link and form inside a <turbo-frame> navigates *within* that
+  frame. That would be wrong twice over: the Queue form's redirect carries flash
+  messages that live outside the frame (so the confirmation would silently
+  vanish), and the "view evaluation" links would try to render a whole detail
+  page inside a table cell. target="_top" makes all navigation originating in
+  here drive the full page, exactly as it did before Turbo was involved.
+
+  Only the poller's programmatic reload() updates the frame — which is precisely
+  the split we want: user actions behave identically with and without
+  JavaScript, and the enhancement is confined to refreshing statuses.
+#}
+<turbo-frame id="evaluation-rows"
+             target="_top"
+             data-controller="evaluation-poll"
+             data-evaluation-poll-url-value="{{ path('lumina_ui_evaluation_new_rows', {trial: trial.id}) }}"
+             data-evaluation-poll-interval-value="5000">
+  {% include '@LuminaUi/evaluation/_patient_rows.html.twig' %}
+</turbo-frame>

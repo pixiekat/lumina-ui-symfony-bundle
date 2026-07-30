@@ -1,31 +1,142 @@
+{#
+  New evaluation — a two-stage workflow on one route.
+
+    no ?trial   → stage 1: pick a trial from the list
+    ?trial=NNN  → stage 2: that trial, plus every patient with a Queue button
+
+  Both stages are ordinary HTML: links to navigate, one small POST form per row
+  to queue. Nothing here needs JavaScript. Pass 2 will wrap the patient table in
+  a <turbo-frame> and poll it for status changes, which is why those rows live in
+  their own partial — the enhancement adds a wrapper, it does not fork the markup.
+#}
 {% extends '@LuminaUi/layout.html.twig' %}
-{% block page_title %}New evaluation{% endblock %}
+{% block page_title %}{{ trial ? 'Queue evaluations' : 'Choose a trial' }}{% endblock %}
 
 {% block content %}
-  <h1>New evaluation</h1>
-  <p class="muted">
-    Runs <code>explain_trial_match</code> for one patient against one trial,
-    in the background.
-  </p>
+  {% if trial is null %}
 
-  <form method="post" action="{{ path('lumina_ui_evaluation_new') }}">
-    <input type="hidden" name="_token" value="{{ csrf_token('new-evaluation') }}">
+    {# ── Stage 1: choose a trial ───────────────────────────────────────────── #}
+    <h1>New evaluation — choose a trial</h1>
+    <p class="muted">
+      Pick the trial you want to evaluate patients against. The next screen lists
+      every patient so you can queue them one at a time.
+    </p>
 
-    <div class="field">
-      <label for="person_id">Patient ID (CTOMOP person_id)</label>
-      <input type="number" id="person_id" name="person_id" min="1" required
-             inputmode="numeric" autocomplete="off">
+    <div class="actions">
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">Back to evaluations</a>
     </div>
 
-    <div class="field">
-      <label for="trial_id">Trial ID</label>
-      <input type="number" id="trial_id" name="trial_id" min="1" required
-             inputmode="numeric" autocomplete="off">
+    {% if total == 0 %}
+      <p class="muted">
+        No trials found. Check that the trials database is reachable and that
+        <code>TRIALS_DATABASE_URL</code> points at the right database.
+      </p>
+    {% else %}
+      <div class="table-wrap">
+        <table>
+          <caption>{{ total }} trial{{ total == 1 ? '' : 's' }} · page {{ page }} of {{ pages }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Study</th>
+              <th scope="col">Title</th>
+              <th scope="col">Phase</th>
+              <th scope="col">Sponsor</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trials %}
+              <tr>
+                <td>{{ t.studyId ?? '—' }}</td>
+                {# Twig's core `length` and `slice` are both multibyte-aware
+                   (mb_strlen / mb_substr), so this cannot split a character in
+                   half the way PHP's substr() would. twig/string-extra's
+                   `|u.truncate` reads nicer but is not installed, and one
+                   truncation is not worth a dependency. #}
+                {% set title = t.displayTitle %}
+                <td>{{ title|length > 110 ? title|slice(0, 110) ~ '…' : title }}</td>
+                <td>{{ t.phaseLabel ?? '—' }}</td>
+                <td>{{ t.sponsorName ?? '—' }}</td>
+                <td>
+                  {% if t.isRecruiting %}
+                    <span class="badge badge--completed">Recruiting</span>
+                  {% else %}
+                    <span class="badge">{{ t.recruitmentStatus ?? 'Unknown' }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {# The accessible name says WHICH trial — a list of identical
+                     "Select" links is unusable in a screen reader's link list. #}
+                  <a class="button" href="{{ path('lumina_ui_evaluation_new', {trial: t.id}) }}">
+                    Select<span class="visually-hidden"> trial {{ t.studyId ?? t.id }}</span>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pages > 1 %}
+        <nav class="pagination" aria-label="Trial pages">
+          {% if page > 1 %}
+            <a href="{{ path('lumina_ui_evaluation_new', {page: page - 1}) }}" rel="prev">← Previous</a>
+          {% else %}
+            <span class="muted" aria-hidden="true">← Previous</span>
+          {% endif %}
+          <span>Page {{ page }} of {{ pages }}</span>
+          {% if page < pages %}
+            <a href="{{ path('lumina_ui_evaluation_new', {page: page + 1}) }}" rel="next">Next →</a>
+          {% else %}
+            <span class="muted" aria-hidden="true">Next →</span>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% endif %}
+
+  {% else %}
+
+    {# ── Stage 2: queue patients against the chosen trial ──────────────────── #}
+    {% import '@LuminaUi/_links.html.twig' as links %}
+
+    <h1>Queue evaluations</h1>
+
+    <div class="trial-summary">
+      <h2>{{ trial.displayTitle }}</h2>
+      <dl class="trial-meta">
+        <div><dt>Study ID</dt><dd>{{ trial.studyId ?? '—' }}</dd></div>
+        <div><dt>Phase</dt><dd>{{ trial.phaseLabel ?? '—' }}</dd></div>
+        <div><dt>Sponsor</dt><dd>{{ trial.sponsorName ?? '—' }}</dd></div>
+        <div><dt>Eligible ages</dt><dd>{{ trial.ageRangeLabel ?? 'Any age' }}</dd></div>
+        <div><dt>Condition</dt><dd>{{ trial.disease ?? '—' }}</dd></div>
+        <div>
+          <dt>Trial record</dt>
+          <dd>{{ links.external(exact_url, 'trials/trial/' ~ trial.id ~ '/change/', trial.id) }}</dd>
+        </div>
+      </dl>
+      {% if trial.link %}
+        <p><a href="{{ trial.link }}" rel="noopener noreferrer" target="_blank">
+          View on {{ trial.register ?? 'the registry' }} (opens in a new tab)
+        </a></p>
+      {% endif %}
     </div>
 
     <div class="actions">
-      <button type="submit">Queue evaluation</button>
-      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">Cancel</a>
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">← Choose a different trial</a>
+      {#
+        The manual refresh. Pass 2 adds polling on top, but this link stays: it is
+        the whole fallback story for a browser with JavaScript disabled, and it
+        costs one line to keep honest.
+      #}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new', {trial: trial.id}) }}">
+        Refresh statuses
+      </a>
     </div>
-  </form>
+
+    {# The frame wrapper, not the bare rows: same markup the poll endpoint
+       returns, so first render and refresh can never diverge. #}
+    {% include '@LuminaUi/evaluation/_patient_rows_frame.html.twig' %}
+
+  {% endif %}
 {% endblock %}

@@ -2,12 +2,14 @@
 declare(strict_types=1);
 namespace Pixiekat\LuminaUiBundle\Controller;
 
-use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Pixiekat\LuminaUiBundle\Entity\Evaluation;
 use Pixiekat\LuminaUiBundle\Entity\EvaluationBatch;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationKind;
+use Pixiekat\LuminaUiBundle\Enum\EvaluationStatus;
 use Pixiekat\LuminaUiBundle\Enum\MatchingSoftware;
+use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
 use Pixiekat\LuminaUiBundle\Message\RunBatch;
 use Pixiekat\LuminaUiBundle\Message\RunEvaluation;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationBatchRepository;
@@ -39,6 +41,8 @@ class EvaluationController extends AbstractController {
     private readonly EvaluationBatchRepository $batches,
     private readonly EntityManagerInterface $em,
     private readonly MessageBusInterface $bus,
+    private readonly PixieInterfaces\Service\PatientManagerInterface $patientManager,
+    private readonly PixieInterfaces\Service\TrialsManagerInterface $trialManager,
   ) {}
 
   /** The landing page: a paginated table of standalone evaluations. */
@@ -75,34 +79,210 @@ class EvaluationController extends AbstractController {
     return $this->redirectToRoute('lumina_ui_evaluation_index');
   }
 
-  /** Create a one-off explain_trial_match evaluation (person × trial). */
-  #[Route('/evaluations/new', name: 'lumina_ui_evaluation_new', methods: ['GET', 'POST'])]
+  /**
+   * Creates a new evaluation for the patient; the first stage is a trial picker, the second stage is a patient queue.
+   *
+   * @return Response
+   * @throws \Doctrine\DBAL\Exception
+   */
+  #[Route('/evaluations/new', name: 'lumina_ui_evaluation_new', methods: ['GET'])]
   public function new(Request $request): Response {
-    if ($request->isMethod('POST')) {
-      if (!$this->isCsrfTokenValid('new-evaluation', (string) $request->request->get('_token'))) {
-        $this->addFlash('error', 'Invalid security token — please try again.');
-        return $this->redirectToRoute('lumina_ui_evaluation_new');
-      }
+    // get trial from the query string, if any.
+    $trialId = $request->query->getInt('trial');
 
-      $personId = (int) $request->request->get('person_id');
-      $trialId = (int) $request->request->get('trial_id');
-      if ($personId <= 0 || $trialId <= 0) {
-        $this->addFlash('error', 'Person ID and Trial ID must both be positive numbers.');
-        return $this->redirectToRoute('lumina_ui_evaluation_new');
-      }
-
-      $evaluation = new Evaluation(MatchingSoftware::Exact, EvaluationKind::ExplainTrialMatch, $personId);
-      $evaluation->setTrialId($trialId);
-      $this->em->persist($evaluation);
-      $this->em->flush();
-
-      $this->bus->dispatch(new RunEvaluation($evaluation->getId()));
-      $this->addFlash('success', sprintf('Queued evaluation #%d — it will run in the background.', $evaluation->getId()));
-
-      return $this->redirectToRoute('lumina_ui_evaluation_show', ['id' => $evaluation->getId()]);
+    // ── Step 1: no trial chosen, so show the list of trials.
+    if ($trialId <= 0) {
+      return $this->render('@LuminaUi/evaluation/new.html.twig', $this->trialPickerData($request));
     }
 
-    return $this->render('@LuminaUi/evaluation/new.html.twig');
+    // ── Step 2: we have a trial, so find the trial by id.
+    $trial = $this->trialManager->find($trialId);
+
+    if ($trial === null) {
+      // no trial found, so redirect back to the trial picker with an error message.
+      $this->addFlash('error', sprintf(
+        'Trial #%d was not found in the trials database. It may have been removed, or this Lumina is pointed at a different trials database.',
+        $trialId,
+      ));
+
+      return $this->redirectToRoute('lumina_ui_evaluation_new');
+    }
+
+    // return the twig template with the list of patients.
+    return $this->render('@LuminaUi/evaluation/new.html.twig', [
+      'trial' => $trial,
+    ] + $this->patientQueueData($trial->id));
+  }
+
+  /**
+   * The table of patients, for the status poller to refresh.
+   *
+   */
+  #[Route('/evaluations/new/rows', name: 'lumina_ui_evaluation_new_rows', methods: ['GET'])]
+  public function newRows(Request $request): Response {
+    $trialId = $request->query->getInt('trial');
+    $trial = $trialId > 0 ? $this->trialManager->find($trialId) : null;
+
+    if ($trial === null) {
+      // No flash-and-redirect here: nothing is watching for one. A poller asking
+      // about a trial that has gone away should get a plain 404 and stop, which
+      // is exactly what the controller's error branch does with it.
+      throw $this->createNotFoundException(sprintf('Trial #%d not found.', $trialId));
+    }
+
+    return $this->render('@LuminaUi/evaluation/_patient_rows_frame.html.twig', [
+      'trial' => $trial,
+    ] + $this->patientQueueData($trial->id));
+  }
+
+  /**
+   * Queues a patient for a trial.
+   *
+   * @return Response
+   * @throws \Doctrine\DBAL\Exception
+   */
+  #[Route('/evaluations/queue', name: 'lumina_ui_evaluation_queue', methods: ['POST'])]
+  public function queue(Request $request): Response {
+    $trialId = (int) $request->request->get('trial_id');
+    $personId = (int) $request->request->get('person_id');
+
+    // is the csrf token valid? If not, redirect back to the trial picker with an error message.
+    if (!$this->isCsrfTokenValid('queue-' . $trialId . '-' . $personId, (string) $request->request->get('_token'))) {
+      $this->addFlash('error', 'Invalid security token — please try again.');
+
+      return $this->redirectToNewFor($trialId, $personId);
+    }
+
+    if ($trialId <= 0 || $personId <= 0) {
+      $this->addFlash('error', 'A trial and a patient must both be selected.');
+
+      return $this->redirectToRoute('lumina_ui_evaluation_new');
+    }
+
+    // checks to see if an evaluation already exists for this trial and person.
+    // show a flash message and redirect back to the trial picker with an error message if it does.
+    $active = $this->evaluations->findActiveFor($trialId, $personId);
+    if ($active !== null) {
+      $this->addFlash('info', sprintf(
+        'Evaluation #%d for this patient is already %s.',
+        $active->getId(),
+        $active->getStatus()->label(),
+      ));
+
+      return $this->redirectToNewFor($trialId, $personId);
+    }
+
+    $evaluation = new Evaluation(MatchingSoftware::Exact, EvaluationKind::ExplainTrialMatch, $personId);
+    $evaluation->setTrialId($trialId);
+
+    // gets the proper patient name from ctomop for the evaluation row.
+    $patient = $this->patientManager->find($personId);
+    if ($patient !== null) {
+      $evaluation->setPatientName($patient->displayName());
+    }
+
+    try {
+      $this->em->persist($evaluation);
+      $this->em->flush();
+    }
+    catch (UniqueConstraintViolationException) {
+      // edge case where two requests try to queue the same patient at the same time. The first one wins, the second one gets this exception. We don't want to throw a 500 error, so we just show a flash message and redirect back to the trial picker with an error message.
+      $this->addFlash('info', 'That evaluation was queued a moment ago by another request.');
+
+      return $this->redirectToNewFor($trialId, $personId);
+    }
+
+    $this->bus->dispatch(new RunEvaluation($evaluation->getId()));
+
+    $this->addFlash('success', sprintf(
+      'Queued evaluation #%d for %s — it will run in the background.',
+      $evaluation->getId(),
+      $patient?->displayName() ?? ('patient ' . $personId),
+    ));
+
+    return $this->redirectToNewFor($trialId, $personId);
+  }
+
+  /**
+   * Queue every patient who has NO evaluation yet against this trial.
+   */
+  #[Route('/evaluations/queue-all', name: 'lumina_ui_evaluation_queue_all', methods: ['POST'])]
+  public function queueAll(Request $request): Response {
+    $trialId = (int) $request->request->get('trial_id');
+
+    if (!$this->isCsrfTokenValid('queue-all-' . $trialId, (string) $request->request->get('_token'))) {
+      $this->addFlash('error', 'Invalid security token — please try again.');
+
+      return $this->redirectToNewFor($trialId, 0);
+    }
+
+    $trial = $trialId > 0 ? $this->trialManager->find($trialId) : null;
+    if ($trial === null) {
+      $this->addFlash('error', 'That trial was not found in the trials database.');
+
+      return $this->redirectToRoute('lumina_ui_evaluation_new');
+    }
+
+    $latest = $this->evaluations->findLatestByTrialIndexedByPerson($trial->id);
+    $remaining = array_filter(
+      $this->patientManager->findAll(),
+      static fn(int $personId): bool => !isset($latest[$personId]),
+      \ARRAY_FILTER_USE_KEY,
+    );
+
+    if ($remaining === []) {
+      $this->addFlash('info', 'Every patient already has an evaluation for this trial.');
+
+      return $this->redirectToNewFor($trial->id, 0);
+    }
+
+    $batch = new EvaluationBatch(MatchingSoftware::Exact, EvaluationKind::ExplainTrialMatch);
+    $batch->setLabel(sprintf(
+      'Queue all — %s (trial %d)',
+      $trial->studyId ?? $trial->displayTitle(),
+      $trial->id,
+    ));
+    $this->em->persist($batch);
+
+    $queued = [];
+    foreach ($remaining as $personId => $patient) {
+      $evaluation = new Evaluation(MatchingSoftware::Exact, EvaluationKind::ExplainTrialMatch, $personId);
+      $evaluation
+        ->setTrialId($trial->id)
+        ->setPatientName($patient->displayName());
+      // Sets both sides of the relation.
+      $batch->addEvaluation($evaluation);
+      $this->em->persist($evaluation);
+      $queued[] = $evaluation;
+    }
+
+    try {
+      // persist the batch and all its evaluations in one transaction. If any of the evaluations already exist, the whole transaction will fail and we will catch the exception below.
+      $this->em->flush();
+    }
+    catch (UniqueConstraintViolationException) {
+      // catch if someone queued the same patient at the same time to protect against 500 errors.
+      $this->addFlash('error', 'Someone queued one of these patients at the same time — nothing was queued. Please try again.');
+
+      return $this->redirectToNewFor($trial->id, 0);
+    }
+
+    // Dispatch only after the flush, so every row has a real id. Each message is
+    // an independent RunEvaluation, which means the existing handler is reused
+    // untouched and every row reports its own status as it goes — which is what
+    // makes the table fill in progressively rather than all at once at the end.
+    foreach ($queued as $evaluation) {
+      $this->bus->dispatch(new RunEvaluation($evaluation->getId()));
+    }
+
+    $this->addFlash('success', sprintf(
+      'Queued %d evaluation%s as batch #%d — they will run in the background.',
+      count($queued),
+      count($queued) === 1 ? '' : 's',
+      $batch->getId(),
+    ));
+
+    return $this->redirectToNewFor($trial->id, 0);
   }
 
   /** Detail view: readable attribute table + raw output. */
@@ -208,5 +388,87 @@ class EvaluationController extends AbstractController {
       throw $this->createNotFoundException(sprintf('Evaluation #%d not found.', $id));
     }
     return $evaluation;
+  }
+
+  /**
+   * Stage 1 view data: one page of trials to choose from.
+   *
+   * @return array<string, mixed>
+   */
+  private function trialPickerData(Request $request): array {
+    $perPage = 25;
+    $page = max(1, $request->query->getInt('page', 1));
+
+    // findAll() is keyed by trial id; array_values gives us a list to slice.
+    $all = array_values($this->trialManager->findAll());
+    $total = count($all);
+    $pages = max(1, (int) ceil($total / $perPage));
+
+    // Clamp AFTER knowing the total, so ?page=999 shows the last page rather
+    // than an empty table with no way to tell what happened.
+    $page = min($page, $pages);
+
+    return [
+      'trial' => null,
+      'trials' => array_slice($all, ($page - 1) * $perPage, $perPage),
+      'page' => $page,
+      'pages' => $pages,
+      'total' => $total,
+    ];
+  }
+
+  /**
+   * Stage 2 view data: every patient, paired with its latest evaluation against
+   * this trial.
+   *
+   * @return array<string, mixed>
+   */
+  private function patientQueueData(int $trialId): array {
+    $patients = $this->patientManager->findAll();
+    $latest = $this->evaluations->findLatestByTrialIndexedByPerson($trialId);
+
+    // Counts for the summary line above the table. Also the seed for the
+    // aria-live region, so screen reader users get one useful sentence rather
+    // than a hundred silently-changing cells.
+    $counts = ['queued' => 0, 'active' => 0, 'completed' => 0, 'failed' => 0];
+    foreach ($latest as $evaluation) {
+      $counts['queued']++;
+      match ($evaluation->getStatus()) {
+        EvaluationStatus::Completed => $counts['completed']++,
+        EvaluationStatus::Failed => $counts['failed']++,
+        default => $counts['active']++,
+      };
+    }
+
+    // Patients with no evaluation at all for this trial — the population the
+    // "Queue all" button acts on. Terminal rows are excluded on purpose: those
+    // would be re-runs, which stay a per-row decision.
+    $remaining = 0;
+    foreach ($patients as $personId => $patient) {
+      if (!isset($latest[$personId])) {
+        $remaining++;
+      }
+    }
+
+    return [
+      'patients' => $patients,
+      'latest' => $latest,
+      'counts' => $counts,
+      'remaining' => $remaining,
+      'hasActive' => $counts['active'] > 0,
+    ];
+  }
+
+  /**
+   * Back to the patient list for a trial, focused on the row just acted upon.
+   */
+  private function redirectToNewFor(int $trialId, int $personId): Response {
+    if ($trialId <= 0) {
+      return $this->redirectToRoute('lumina_ui_evaluation_new');
+    }
+
+    $url = $this->generateUrl('lumina_ui_evaluation_new', ['trial' => $trialId]);
+
+    return $this->redirect($personId > 0 ? $url . '#patient-' . $personId : $url);
   }
 }

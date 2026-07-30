@@ -75,6 +75,62 @@ final class RunEvaluationHandler {
     }
 
     $this->em->flush();
+
+    $this->rollUpBatch($evaluation);
+  }
+
+  /**
+   * Keep a parent batch's status in step with its children.
+   *
+   * "Queue all" creates a batch of independent RunEvaluation messages rather
+   * than one big command, so nothing else would ever move the batch off Pending
+   * — /batches would show a batch that is permanently queued while its rows are
+   * all long finished. Each child rolls the parent up as it lands; the last one
+   * to finish is the one that marks it terminal.
+   *
+   * Counts come from the database rather than from $batch->getEvaluations(),
+   * because with more than one worker consuming the queue this handler's
+   * in-memory view of its siblings can be out of date. See
+   * EvaluationRepository::countInBatchWithStatus().
+   *
+   * Safe to run concurrently: every writer computes the same answer from the
+   * same rows, so a duplicate roll-up is a no-op rather than a conflict.
+   */
+  private function rollUpBatch(Evaluation $evaluation): void {
+    $batch = $evaluation->getBatch();
+    if ($batch === null) {
+      return;
+    }
+
+    $batchId = $batch->getId();
+    $active = $this->evaluations->countInBatchWithStatus($batchId, [
+      EvaluationStatus::Pending,
+      EvaluationStatus::Running,
+    ]);
+
+    if ($batch->getStartedAt() === null) {
+      $batch->setStartedAt(new \DateTimeImmutable());
+    }
+
+    if ($active > 0) {
+      $batch->setStatus(EvaluationStatus::Running);
+      $this->em->flush();
+
+      return;
+    }
+
+    // Everything has landed. A batch counts as Failed if ANY child failed —
+    // quietly reporting "Completed" over a batch with failures in it would be
+    // the kind of summary that stops people looking closer.
+    $failed = $this->evaluations->countInBatchWithStatus($batchId, [EvaluationStatus::Failed]);
+
+    $batch->setStatus($failed > 0 ? EvaluationStatus::Failed : EvaluationStatus::Completed);
+
+    if ($batch->getFinishedAt() === null) {
+      $batch->setFinishedAt(new \DateTimeImmutable());
+    }
+
+    $this->em->flush();
   }
 
   /** Fill the parsed fields based on the command kind. */

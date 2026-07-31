@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Pixiekat\LuminaUiBundle\MessageHandler;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Pixiekat\LuminaUiBundle\Entity;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationKind;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationStatus;
 use Pixiekat\LuminaUiBundle\Message\RunEvaluation;
@@ -96,7 +97,7 @@ final class RunEvaluationHandler {
    * Safe to run concurrently: every writer computes the same answer from the
    * same rows, so a duplicate roll-up is a no-op rather than a conflict.
    */
-  private function rollUpBatch(Evaluation $evaluation): void {
+  private function rollUpBatch(Entity\Evaluation $evaluation): void {
     $batch = $evaluation->getBatch();
     if ($batch === null) {
       return;
@@ -134,7 +135,7 @@ final class RunEvaluationHandler {
   }
 
   /** Fill the parsed fields based on the command kind. */
-  private function applyParsedResult(object $evaluation, string $stdout): void {
+  private function applyParsedResult(Entity\Evaluation $evaluation, string $stdout): void {
     if ($evaluation->getKind() === EvaluationKind::ExplainTrialMatch) {
       $parsed = $this->parser->parseExplain($stdout);
       $evaluation

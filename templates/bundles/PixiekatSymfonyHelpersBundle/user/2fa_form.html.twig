@@ -1,0 +1,98 @@
+{# templates/user/2fa_form.html.twig #}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}{{ parent() }} - Two-Factor Authentication{% endblock %}
+
+{% block body %}
+  {#
+    Bundle-provided strings (auth_code, choose_provider, login, trusted, cancel)
+    are translated via the 'SchebTwoFactorBundle' domain, which ships EN/FR (and
+    more) out of the box. App-specific strings use the default 'messages' domain.
+  #}
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-6">
+
+        {# Authentication errors (e.g. invalid/expired code) #}
+        {% if authenticationError %}
+          <div class="alert alert-danger">
+            {{ authenticationError|trans(authenticationErrorData, 'SchebTwoFactorBundle') }}
+          </div>
+        {% endif %}
+
+        {# Provider switcher — only shown when more than one method is available #}
+        {% if availableTwoFactorProviders|length > 1 %}
+          <p class="mb-2">{{ 'choose_provider'|trans({}, 'SchebTwoFactorBundle') }}:</p>
+          <ul class="list-inline mb-4">
+            {% for provider in availableTwoFactorProviders %}
+              <li class="list-inline-item">
+                <a href="{{ path('2fa_login', {'preferProvider': provider}) }}">{{ provider|title }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        {# Verification card — matches the .card look used across the app #}
+        <div class="card">
+          <div class="card-body">
+            {#
+              data-turbo="false" forces a full-page form POST so 2FA still works
+              with JavaScript disabled (graceful degradation).
+            #}
+            <div data-turbo="false">
+              <form class="form" action="{{ checkPathUrl ? checkPathUrl : path(checkPathRoute) }}" method="post">
+
+                <div class="form-group">
+                  <label class="form-label" for="_auth_code">
+                    {{ twoFactorProvider|title }} {{ 'auth_code'|trans({}, 'SchebTwoFactorBundle') }}
+                  </label>
+                  {#
+                    inputmode/pattern improve the mobile keypad for numeric OTPs.
+                    aria-describedby matches the help element id below (a11y).
+                  #}
+                  <input
+                    id="_auth_code"
+                    class="form-control"
+                    type="text"
+                    name="{{ authCodeParameterName }}"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="one-time-code"
+                    aria-describedby="authCodeHelp"
+                    placeholder="{{ 'Enter your two-factor code'|trans }}"
+                    autofocus>
+                  <small id="authCodeHelp" class="form-text text-muted">
+                    {{ 'A code was sent to your registered email address. If you didn\'t receive it, please check your spam folder.'|trans }}
+                  </small>
+                </div>
+
+                {% if displayTrustedOption %}
+                  <div class="form-check">
+                    <input class="form-check-input" id="_trusted" type="checkbox" name="{{ trustedParameterName }}">
+                    <label class="form-check-label" for="_trusted">
+                      {{ 'trusted'|trans({}, 'SchebTwoFactorBundle') }}
+                    </label>
+                  </div>
+                {% endif %}
+
+                <div class="btn-group my-3" role="group" aria-label="{{ 'Enter code'|trans }}">
+                  <button class="btn btn-primary" type="submit">
+                    {{ 'login'|trans({}, 'SchebTwoFactorBundle') }}
+                  </button>
+                  <a class="btn btn-link" href="{{ logoutPath }}">
+                    {{ 'cancel'|trans({}, 'SchebTwoFactorBundle') }}
+                  </a>
+                </div>
+
+                {% if isCsrfProtectionEnabled %}
+                  <input type="hidden" name="{{ csrfParameterName }}" value="{{ csrf_token(csrfTokenId) }}">
+                {% endif %}
+              </form>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+{% endblock %}

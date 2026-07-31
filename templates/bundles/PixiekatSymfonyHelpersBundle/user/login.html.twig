@@ -1,5 +1,6 @@
 {% extends '@LuminaUi/layout.html.twig' %}
 {% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}{{ parent() }} - Login{% endblock %}
 
 {% block body %}
   {% if error %}
@@ -7,19 +8,23 @@
   {% endif %}
 
   <div class="container">
-    <div class="row">
-      <div class="col">
-        <h1>Login</h1>
-        <p>Login to your accountasdasdasd</p>
 
-        <div data-turbo="false">
-            {{ form_start(form) }}
-            {{ form_row(form._username) }}
-            {{ form_row(form._password) }}
-            {{ form_rest(form) }}
-            {{ form_end(form, {'render_rest': false}) }}
-        </div>
+    <div class="row">
+      <div class="col-12">
+        <h1>Welcome to Lumina UI</h1>
+        <p class="muted">Lumina UI is a web interface for running evaluations and batch searches on the Lumina platform. Please log in to continue.</p>
       </div>
     </div>
+
+    <div class="row">
+      <div class="col" style="max-width: 400px;">
+        {{ form_start(form, {'attr': {'data-turbo': 'false'}}) }}
+          {{ form_row(form._username) }}
+          {{ form_row(form._password) }}
+          {{ form_rest(form) }}
+        {{ form_end(form, {'render_rest': false}) }}
+      </div>
+    </div>
+
   </div>
 {% endblock %}

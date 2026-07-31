@@ -4,6 +4,7 @@ namespace Pixiekat\LuminaUiBundle\Entity;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Nowo\DoctrineEncryptBundle\Configuration\Encrypted;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationKind;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationStatus;
 use Pixiekat\LuminaUiBundle\Enum\MatchingSoftware;
@@ -61,6 +62,7 @@ class Evaluation {
 
   /** Patient display name when the command reports it (e.g. "Evelyn Lopez"). */
   #[ORM\Column(length: 255, nullable: true)]
+  #[Encrypted]
   private ?string $patientName = null;
 
   /** Trial id (e.g. 24660). Only set for explain_trial_match. */

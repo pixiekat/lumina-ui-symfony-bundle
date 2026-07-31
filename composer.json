@@ -7,10 +7,12 @@
     "require": {
         "php": ">=8.4",
         "symfony/framework-bundle": "^8.1",
+        "defuse/php-encryption": "^2.1",
         "doctrine/orm": "^3.6",
         "doctrine/dbal": "^4.4",
         "doctrine/doctrine-bundle": "^3.2",
-        "doctrine/doctrine-migrations-bundle": "^4.0"
+        "doctrine/doctrine-migrations-bundle": "^4.0",
+        "nowo-tech/doctrine-encrypt-bundle": "^2.3"
     },
     "autoload": {
         "psr-4": {

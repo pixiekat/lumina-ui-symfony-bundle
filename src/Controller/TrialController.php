@@ -125,18 +125,11 @@ class TrialController extends AbstractController {
       throw $this->createNotFoundException(sprintf('No evaluations recorded for trial #%d.', $trialId));
     }
 
-    // usort() is not stable across equal keys in the way we want, so the
-    // comparator resolves ties explicitly rather than leaving them to chance:
-    // most matches first, then fewest unknowns (a 5-match result built on solid
-    // data outranks one where half the attributes were unreadable), then newest.
-    // A deterministic total order is not a nicety — without it, two rows with
-    // equal match counts could swap places between page 1 and page 2 and a row
-    // would vanish from the pager entirely.
-    usort($evaluations, static function (Evaluation $a, Evaluation $b): int {
-      return $b->getMatchedCount() <=> $a->getMatchedCount()
-        ?: $a->getUnknownCount() <=> $b->getUnknownCount()
-        ?: $b->getId() <=> $a->getId();
-    });
+    // The ranking rule itself lives on the entity, so this screen and the
+    // per-patient one can never drift apart about which run counts as "best".
+    // See Evaluation::compareByMatchQuality() for the three tiers and why the
+    // final tiebreaker matters to the pager below.
+    usort($evaluations, Evaluation::compareByMatchQuality(...));
 
     $total = count($evaluations);
     $pages = max(1, (int) ceil($total / self::PER_PAGE));

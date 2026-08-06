@@ -1,0 +1,186 @@
+{#
+  One patient's runs — every evaluation recorded for them, best match first.
+
+  The mirror of trial/show.html.twig, with one real difference: a patient's runs
+  can be EITHER command kind, and the two are not the same measurement.
+
+    explain_trial_match        → one trial, with a per-attribute breakdown.
+                                 Ranked on the matched count.
+    search_trials_for_patients → the whole catalogue at once. No breakdown at
+                                 all; its headline is a best-match percentage.
+
+  Rather than leave search rows as a line of em dashes to be misread as "nothing
+  matched", the row says what kind of run it was and shows the figure that kind
+  actually produces. They sort to the bottom because they score zero matched
+  attributes — honest placement for a different measurement, not a failure.
+
+  Read-only and script-free, like the index it links back from.
+#}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}{{ patient ? patient.displayName : 'Patient #' ~ personId }} — runs{% endblock %}
+
+{% block content %}
+  <p><a href="{{ path('lumina_ui_patient_index') }}">&larr; All patients</a></p>
+
+  <h1>Patient runs</h1>
+
+  {#
+    The patient summary card. `patient` is null when ctomop is unreachable or the
+    person has since been removed — the runs below are ours and stay readable
+    either way, so this degrades to a short explanation instead of taking the
+    page down.
+  #}
+  <div class="trial-summary">
+    {% if patient %}
+      <h2>{{ patient.displayName }}</h2>
+      <dl class="trial-meta">
+        <div><dt>Person ID</dt>
+          <dd>{{ links.external(ctomop_url, 'patient/' ~ patient.personId, patient.personId) }}</dd></div>
+        {# approximateAge() is an approximation by construction — ctomop records
+           a birth YEAR, not a date — so the label says so rather than implying a
+           precision the data does not have. #}
+        <div><dt>Approx. age</dt><dd>{{ patient.approximateAge ?? '—' }}</dd></div>
+        <div><dt>Condition</dt><dd>{{ patient.disease ?? '—' }}</dd></div>
+        <div><dt>Stage</dt><dd>{{ patient.stage ?? '—' }}</dd></div>
+        <div><dt>ECOG</dt><dd>{{ patient.ecogPerformanceStatus ?? '—' }}</dd></div>
+        <div><dt>Karnofsky</dt><dd>{{ patient.karnofskyPerformanceScore ?? '—' }}</dd></div>
+      </dl>
+      {% if not patient.hasClinicalSummary %}
+        <p class="muted">No clinical data recorded for this patient in ctomop.</p>
+      {% endif %}
+    {% else %}
+      <h2>Patient #{{ personId }}</h2>
+      <p class="muted">
+        This patient could not be read from the ctomop database — they may have
+        been removed, or ctomop may be unreachable. The runs below are unaffected.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="actions">
+    <a class="button button--secondary" href="{{ path('lumina_ui_patient_index') }}">Back to patients</a>
+    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <caption>
+        {{ total }} run{{ total == 1 ? '' : 's' }} · page {{ page }} of {{ pages }} ·
+        sorted by matched attributes, highest first
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Trial</th>
+          <th scope="col">Matched</th>
+          <th scope="col">Not matched</th>
+          <th scope="col">Unknown</th>
+          <th scope="col">Status</th>
+          <th scope="col">Run</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in evaluations %}
+          {# Compare on the backing value rather than the enum case: Twig's
+             enum() function is not available in every Twig version this bundle
+             may run under, and the string is unambiguous. #}
+          {% set is_explain = e.kind.value == 'explain_trial_match' %}
+          {% set trial = e.trialId ? trials[e.trialId] ?? null : null %}
+          <tr>
+            <td>{{ e.id }}</td>
+            <td>
+              {% if e.trialId %}
+                {# Lead with the study id a human recognises; keep the internal
+                   id as the link into the EXACT admin. Both are unavailable when
+                   exact_db is down, so fall back to the id we stored ourselves. #}
+                {% if trial and trial.studyId %}
+                  <a href="{{ path('lumina_ui_trial_show', {trialId: e.trialId}) }}">{{ trial.studyId }}</a>
+                  <span class="muted">({{ links.external(exact_url, 'trials/trial/' ~ e.trialId ~ '/change/', e.trialId) }})</span>
+                {% else %}
+                  <a href="{{ path('lumina_ui_trial_show', {trialId: e.trialId}) }}">Trial {{ e.trialId }}</a>
+                {% endif %}
+              {% else %}
+                {# A search run covers the whole catalogue, so there is no single
+                   trial to name. Say that, rather than printing a bare dash. #}
+                <span class="muted">All trials</span>
+              {% endif %}
+            </td>
+            {% if is_explain %}
+              <td>
+                {# "74 of 90" rather than a bare 74: the denominator varies by
+                   trial, so the raw count alone is not comparable and reads as a
+                   score out of nothing. #}
+                {% if e.attributeCount > 0 %}
+                  {{ e.matchedCount }} <span class="muted">of {{ e.attributeCount }}</span>
+                {% else %}
+                  {# No breakdown yet — still queued, or it failed before
+                     producing parseable output. #}
+                  <span class="muted">—</span>
+                {% endif %}
+              </td>
+              <td>{{ e.attributeCount > 0 ? e.notMatchedCount : '—' }}</td>
+              <td>{{ e.attributeCount > 0 ? e.unknownCount : '—' }}</td>
+             <!-- <td>{{ e.summary.overallCtomop ?? '—' }}</td>-->
+            {% else %}
+              {#
+                A search run has no attribute breakdown, so the three match
+                columns do not apply to it. ONE cell spanning all three says so,
+                which beats three em dashes — those read as "nothing matched"
+                when the truth is "this was a different measurement".
+
+                The span has to cover all three, not two. Splitting it would put
+                the best-match figure in the cell under the "Unknown" header, and
+                a screen reader announces the column header before the cell — so
+                it would read the percentage out as an unknown-attribute count.
+                Cell alignment IS the accessible label in a data table.
+              #}
+              <td colspan="3" class="muted">
+                Trial search — no per-attribute breakdown.
+                {%- if e.summary.bestMatchPercent is defined and e.summary.bestMatchPercent is not null %}
+                  Best match {{ e.summary.bestMatchPercent }}% across
+                  {{ e.summary.total ?? 'all' }} trials
+                  {%- if e.summary.eligible is defined %}, {{ e.summary.eligible }} eligible{% endif -%}
+                  .
+                {%- endif %}
+              </td>
+            {% endif %}
+            <td><span class="badge badge--{{ e.status.value }}">{{ e.status.label }}</span></td>
+            <td>
+              {% if e.ranAt %}
+                <time datetime="{{ e.ranAt|date('c') }}">{{ e.ranAt|date('Y-m-d H:i') }}</time>
+              {% else %}
+                <span class="muted">queued {{ e.createdAt|date('Y-m-d H:i') }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">
+                View<span class="visually-hidden"> evaluation {{ e.id }}</span>
+              </a>
+              · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
+                JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pages > 1 %}
+    <nav class="pagination" aria-label="Run pages">
+      {% if page > 1 %}
+        <a href="{{ path('lumina_ui_patient_show', {personId: personId, page: page - 1}) }}" rel="prev">← Previous</a>
+      {% else %}
+        <span class="muted" aria-hidden="true">← Previous</span>
+      {% endif %}
+      <span>Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}
+        <a href="{{ path('lumina_ui_patient_show', {personId: personId, page: page + 1}) }}" rel="next">Next →</a>
+      {% else %}
+        <span class="muted" aria-hidden="true">Next →</span>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

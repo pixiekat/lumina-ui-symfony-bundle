@@ -220,6 +220,74 @@ class EvaluationRepository extends ServiceEntityRepository {
       ->getResult();
   }
 
+  /**
+   * One row per patient that has ever been evaluated, with their run counts.
+   *
+   * The mirror of findTrialGroups() — same aggregate, the other axis — and it
+   * backs the /patients index the same way.
+   *
+   * ── The one structural difference from the trial version ───────────────────
+   * There is no `IS NOT NULL` guard here, and that is deliberate rather than an
+   * oversight. `person_id` is NOT NULL on every evaluation row, including the
+   * `search_trials_for_patients` kind (one patient across ALL trials), which has
+   * a patient but no single trial and is therefore invisible to findTrialGroups().
+   * Grouping by patient legitimately sweeps up both kinds, so these counts mean
+   * "every run we hold for this person".
+   *
+   * Note what is NOT selected: Evaluation::$patientName. It is an `#[Encrypted]`
+   * column, so MAX() over it would aggregate ciphertext and return a blob, not a
+   * name. Names come from ctomop via PatientManager::findMany() in the controller
+   * — see PatientEvaluationGroup's docblock.
+   *
+   * Aggregates come back as raw driver values, not converted types; see
+   * ReadModel\EvaluationGroup::toDateTime() for what that means and who fixes it.
+   *
+   * @return list<array{personId: int, evaluationCount: int, lastRanAt: ?string, lastQueuedAt: ?string}>
+   */
+  public function findPatientGroups(): array {
+    return $this->createQueryBuilder('e')
+      ->select(
+        'e.personId AS personId',
+        'COUNT(e.id) AS evaluationCount',
+        'MAX(e.ranAt) AS lastRanAt',
+        'MAX(e.createdAt) AS lastQueuedAt',
+      )
+      ->groupBy('e.personId')
+      // Ordering by the SELECT alias (a DQL "result variable"), with personId as
+      // the tiebreaker so the order is TOTAL. Without that tiebreaker two
+      // patients queued in the same second could swap places between requests,
+      // and a pager would repeat one row while skipping the other.
+      ->orderBy('lastQueuedAt', 'DESC')
+      ->addOrderBy('personId', 'DESC')
+      ->getQuery()
+      ->getResult();
+  }
+
+  /**
+   * Every evaluation recorded for ONE patient, newest first.
+   *
+   * The mirror of findByTrial(), and it carries the same caveat: the "matches"
+   * these get ranked by are counted inside the `attributes` JSON column, so the
+   * sort happens in PHP (Evaluation::compareByMatchQuality) rather than in SQL.
+   * The reasoning, and the Postgres-native alternative for when the row count
+   * justifies it, are written up on findByTrial().
+   *
+   * Unlike the trial version this can return BOTH command kinds — a patient has
+   * search runs as well as per-trial explain runs. The template distinguishes
+   * them; the caller does not need to.
+   *
+   * @return Evaluation[]
+   */
+  public function findByPatient(int $personId): array {
+    return $this->createQueryBuilder('e')
+      ->andWhere('e.personId = :person')
+      ->setParameter('person', $personId)
+      ->orderBy('e.createdAt', 'DESC')
+      ->addOrderBy('e.id', 'DESC')
+      ->getQuery()
+      ->getResult();
+  }
+
   /** Persist + flush a single evaluation. Small convenience for handlers/controllers. */
   public function save(Evaluation $evaluation, bool $flush = true): void {
     $em = $this->getEntityManager();

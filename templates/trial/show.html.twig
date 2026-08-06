@@ -80,7 +80,12 @@
         {% for e in evaluations %}
           <tr>
             <td>{{ e.id }}</td>
-            <td>{{ e.patientName ?? '—' }}
+            {# Cross-link to the other axis: from "how did this trial do?" to
+               "what else do we know about this person?". The stored patientName
+               is preferred over a ctomop lookup here — it is already on the row,
+               and avoiding a per-row query is the whole point of the batching
+               discipline used elsewhere. #}
+            <td><a href="{{ path('lumina_ui_patient_show', {personId: e.personId}) }}">{{ e.patientName ?? ('Patient ' ~ e.personId) }}</a>
               <span class="muted">({{ links.external(ctomop_url, 'patient/' ~ e.personId, e.personId) }})</span></td>
             <td>
               {# "7 of 12" rather than a bare 7: the denominator varies by trial,

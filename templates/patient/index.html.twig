@@ -1,0 +1,106 @@
+{#
+  Patients — evaluations grouped by the patient they were run for.
+
+  The mirror of trial/index.html.twig: same shape, the other axis. One row per
+  patient, and "View" drills into patient/show.html.twig for their ranked runs.
+
+  Plain HTML throughout: links to navigate, no forms, nothing that needs
+  JavaScript. Every row is readable and every control usable with scripting off.
+#}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}Patients{% endblock %}
+
+{% block content %}
+  <h1>Patients</h1>
+  <p>
+    Distinct patients that have been evaluated, sorted by the most recent
+    evaluation. Each row shows how many runs we hold for that patient — both
+    single-trial explanations and whole-catalogue trial searches. Clicking view
+    will show you every run for that patient, best match first.
+  </p>
+
+  <div class="actions">
+    <a class="button button--secondary" href="{{ path('lumina_ui_trial_index') }}">Trials</a>
+    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">All evaluations</a>
+    <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+  </div>
+
+  {% if total == 0 %}
+    <p class="muted">
+      No patients have been evaluated yet. Start one with “New evaluation” — this
+      page fills in as soon as the first run is queued.
+    </p>
+  {% else %}
+    <div class="table-wrap">
+      <table>
+        <caption>
+          {{ total }} patient{{ total == 1 ? '' : 's' }} with evaluations · page {{ page }} of {{ pages }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Patient ID</th>
+            <th scope="col">Patient name</th>
+            <th scope="col">Evaluations</th>
+            <th scope="col">Last run</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+            <tr>
+              {# The person_id links straight into ctomop, the system of record
+                 for everything about this person. #}
+              <td>{{ links.external(ctomop_url, 'patient/' ~ group.personId, group.personId) }}</td>
+              <td>
+                {# displayTitle() degrades to "Patient #N (not in ctomop)" when
+                   the record cannot be read, so this cell is never empty. #}
+                {{ group.displayTitle }}
+              </td>
+              <td>{{ group.evaluationCount }}</td>
+              <td>
+                {% set when = group.displayDate %}
+                {% if when %}
+                  <time datetime="{{ when|date('c') }}">{{ when|date('Y-m-d H:i') }}</time>
+                  {# Say WHICH date this is when it is not a completed run. A
+                     queue time printed silently under a "Last run" heading would
+                     read as a finished run that it is not. #}
+                  {% if not group.hasFinishedRun %}
+                    <span class="muted">(queued, not finished)</span>
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {# The accessible name names the patient: a screen reader's link
+                   list of twenty-five identical "View" links is unusable. #}
+                <a class="button" href="{{ path('lumina_ui_patient_show', {personId: group.personId}) }}">
+                  View<span class="visually-hidden"> runs for {{ group.displayTitle }}</span>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+      <nav class="pagination" aria-label="Patient pages">
+        {% if page > 1 %}
+          <a href="{{ path('lumina_ui_patient_index', {page: page - 1}) }}" rel="prev">← Previous</a>
+        {% else %}
+          {# Rendered as inert text rather than omitted, so the controls do not
+             shift position between pages. #}
+          <span class="muted" aria-hidden="true">← Previous</span>
+        {% endif %}
+        <span>Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}
+          <a href="{{ path('lumina_ui_patient_index', {page: page + 1}) }}" rel="next">Next →</a>
+        {% else %}
+          <span class="muted" aria-hidden="true">Next →</span>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% endif %}
+{% endblock %}

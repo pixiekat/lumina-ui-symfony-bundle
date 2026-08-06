@@ -328,4 +328,36 @@ class Evaluation {
   public function getAttributeCount(): int {
     return is_array($this->attributes) ? count($this->attributes) : 0;
   }
+
+  /**
+   * The ranking rule for "best result first", as a usort() comparator.
+   *
+   *     usort($evaluations, Evaluation::compareByMatchQuality(...));
+   *
+   * Used by BOTH the per-trial and the per-patient results tables, which is
+   * exactly why it lives here rather than being written out twice in two
+   * controllers: two copies of a sort rule drift, and the two screens would
+   * quietly start disagreeing about which run was "best".
+   *
+   * ── The three tiers, and why each one is needed ────────────────────────────
+   *   1. Most matched attributes first. The headline question.
+   *   2. Then FEWEST unknowns. A 5-match result built on complete data is a
+   *      stronger answer than a 5-match result where half the attributes were
+   *      unreadable; without this tier those two sort arbitrarily.
+   *   3. Then highest id — newest run — as a final tiebreaker.
+   *
+   * Tier 3 is not cosmetic. Both screens paginate an array they sorted in PHP, so
+   * the order MUST be total: if two equal rows could swap places between the
+   * request for page 1 and the request for page 2, a row would appear twice and
+   * another would never be seen at all. Any sort that feeds a pager needs a
+   * unique final key, and the primary key is the reliable one.
+   *
+   * `?:` chains here rather than `<=>` alone because each comparison returns 0 on
+   * a tie, which is precisely when the next tier should decide.
+   */
+  public static function compareByMatchQuality(self $a, self $b): int {
+    return $b->getMatchedCount() <=> $a->getMatchedCount()
+      ?: $a->getUnknownCount() <=> $b->getUnknownCount()
+      ?: $b->getId() <=> $a->getId();
+  }
 }

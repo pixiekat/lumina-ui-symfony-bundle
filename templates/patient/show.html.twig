@@ -33,7 +33,7 @@
   #}
   <div class="trial-summary">
     {% if patient %}
-      <h2>{{ patient.displayName }}</h2>
+      {#<h2>{{ patient.displayName }}</h2>#}
       <dl class="trial-meta">
         <div><dt>Person ID</dt>
           <dd>{{ links.external(ctomop_url, 'patient/' ~ patient.personId, patient.personId) }}</dd></div>

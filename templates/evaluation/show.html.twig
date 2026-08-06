@@ -63,6 +63,12 @@
       <tr><th scope="row">Ran at</th>
         <td>{{ evaluation.ranAt ? evaluation.ranAt|date('Y-m-d H:i:s') : '—' }}
           {%- if evaluation.durationMs %} <span class="muted">({{ evaluation.durationMs }} ms)</span>{% endif %}</td></tr>
+      <tr><th scope="row">Clintrials.gov Link</th><td>
+        {% if trial and trial.link %}
+          <a href="{{ trial.link }}" target="_blank" rel="noopener noreferrer">{{ trial.studyId }}</a>
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
     </tbody>
   </table>
 

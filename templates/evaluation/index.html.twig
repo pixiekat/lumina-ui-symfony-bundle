@@ -3,15 +3,15 @@
 {% block page_title %}Evaluations{% endblock %}
 
 {% block content %}
-  <h1>Evaluations</h1>
-  <p>Evaluations run using one trial and one patient and returns a detailed explanation of the match.</p>
+  <h1>All Evaluations</h1>
+  <p>A list of all evaluations that have been run. Evaluations are created by selecting a trial and then queuing a patient for evaluation. You can view all evaluations by trial by clicking <a href="{{ path('lumina_ui_trial_index') }}">here</a> and all evaluations by patient by clicking <a href="{{ path('lumina_ui_patient_index') }}">here</a>.</p>
 
   <div class="actions">
     <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
     <form method="post" action="{{ path('lumina_ui_evaluation_run_all') }}"
           onsubmit="return confirm('Run a trial search for ALL patients in the background?');">
       <input type="hidden" name="_token" value="{{ csrf_token('run-all') }}">
-      <button type="submit" class="button--secondary">Run all (search trials)</button>
+      {# <button type="submit" class="button--secondary">Run all (search trials)</button> #}
     </form>
   </div>
 

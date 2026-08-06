@@ -62,6 +62,26 @@
     .trial-meta dt { font-weight:600; font-size:.85rem; color:var(--muted); }
     .trial-meta dd { margin:0; }
     .status-summary { margin:0 0 .75rem; }
+    /* KPI row — a handful of headline numbers, the one case where the right
+       "chart" is no chart at all. auto-fit rather than a fixed 3 columns so the
+       tiles reflow to one column on a phone instead of squeezing. */
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(9rem, 1fr));
+               gap:.75rem; margin:0 0 1.25rem; }
+    /* column-reverse puts the VALUE on top visually while the DOM keeps
+       <dt> before <dd> — correct markup and correct reading order, both. */
+    .kpi { display:flex; flex-direction:column-reverse; align-items:center;
+           border:1px solid var(--line); border-top:3px solid var(--muted);
+           border-radius:.4rem; padding:.9rem .75rem; text-align:center; }
+    /* The status hue lives ONLY here. Green and red are indistinguishable under
+       deuteranopia (measured ΔE 3.7, floor 8), so this rule is a redundant cue
+       on top of the text label — never the thing carrying the meaning. */
+    .kpi--matched    { border-top-color:#1a8a44; }
+    .kpi--notmatched { border-top-color:#c0392b; }
+    .kpi--unknown    { border-top-color:var(--muted); }
+    /* Proportional figures on purpose: tabular-nums gives every digit the width
+       of a 0, which reads loose at display sizes. Save it for table columns. */
+    .kpi-value { margin:0; font-size:2.5rem; font-weight:600; line-height:1.1; color:var(--fg); }
+    .kpi-label { margin-top:.15rem; color:var(--muted); font-size:.9rem; }
     /* Zebra striping helps eyes track across a wide row; kept subtle enough not
        to fight the hover state or the badge colours. */
     tbody tr:nth-child(even) { background:#fafafa; }

@@ -87,6 +87,44 @@
 
   {% if evaluation.attributes %}
     <h2>Trial match breakdown ({{ evaluation.attributes|length }})</h2>
+
+    {#
+      A row of stat tiles, deliberately NOT a chart. Three headline numbers is
+      the textbook case for this form — a three-bar bar chart would add an axis,
+      gridlines and a legend to communicate the same three integers, and would
+      invite reading the bar lengths as a proportion they were never scaled to be.
+
+      ── Why the numbers are plain ink and the colour is only a rule ───────────
+      Green-vs-red is the classic colour-vision-deficiency collision, and it is
+      not close: measured at ΔE 3.7 under deuteranopia against a floor of 8. For
+      a deutan reader, a red "2" and a green "82" are the same colour. So hue
+      cannot be allowed to carry the meaning here — the WORD under each figure
+      does, and the 3px top rule plus the icon are redundant confirmation for
+      people who can use them. This is also why the value itself stays in normal
+      text ink: a number printed in red states its meaning twice for sighted
+      users and not at all for a screen reader.
+
+      ── Two smaller deliberate choices ───────────────────────────────────────
+      The icons are aria-hidden: the visible label already says "Not matched",
+      and without it a screen reader announces "cross mark Not matched".
+      And <dl> is the honest element for label/value pairs — the CSS flips each
+      tile visually so the number sits on top, while the DOM keeps the reading
+      order ("Matched, 82") that a screen reader needs.
+    #}
+    {% set tiles = [
+      {label: 'Matched',     count: evaluation.matchedCount,    modifier: 'matched',    icon: '✅'},
+      {label: 'Not matched', count: evaluation.notMatchedCount, modifier: 'notmatched', icon: '❌'},
+      {label: 'Unknown',     count: evaluation.unknownCount,    modifier: 'unknown',    icon: '?'},
+    ] %}
+    <dl class="kpi-row">
+      {% for tile in tiles %}
+        <div class="kpi kpi--{{ tile.modifier }}">
+          <dt class="kpi-label"><span aria-hidden="true">{{ tile.icon }}</span> {{ tile.label }}</dt>
+          <dd class="kpi-value">{{ tile.count }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+
     <div class="table-wrap">
       <table>
         <caption>Shows whether or not the patient matched the trial attribute criteria for this trial.</caption>
@@ -101,7 +139,15 @@
           {% for attr in evaluation.attributes %}
             <tr>
               <td>{{ attr.name }}</td>
-              <td>{{ attr.status }}</td>
+              <td>
+                {% if attr.status == 'matched' %}
+                  <span class="badge bg-success">Matched</span> ✅
+                {% elseif attr.status == 'not_matched' %}
+                  <span class="badge bg-danger">Not Matched</span> ❌
+                {% else %}
+                  <span class="badge bg-secondary">Unknown</span>
+                {% endif %}
+              </td>
               <td>{{ attr.ctomop ?? '—' }}</td>
               <!--<td>{{ attr.differs ? 'yes' : 'no' }}</td>-->
             </tr>

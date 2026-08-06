@@ -53,7 +53,6 @@
         {% endif %}
         {# evaluation.trialId ? links.external(exact_url, 'trials/trial/' ~ evaluation.trialId ~ '/change/', evaluation.trialId) : '—' #}
       </td></tr>
-      <tr><th scope="row">Trial Disease</th><td>{{ evaluation.disease ?? '—' }}</td></tr>
       <tr><th scope="row">Software</th><td>{{ evaluation.software.label }}</td></tr>
       <tr><th scope="row">Kind</th><td>{{ evaluation.kind.label }}</td></tr>
       {% if evaluation.batch %}

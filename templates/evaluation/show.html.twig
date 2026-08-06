@@ -4,7 +4,16 @@
 
 {% block content %}
   {% set trialsManager = get_trials_manager() %}
-  {% set trial = trialsManager.find(evaluation.trialId) %}
+  {#
+    Guard the CALL, not just the display. `trialId` is null on every
+    search_trials_for_patients row (they cover the whole catalogue, so there is
+    no single trial), and TrialsManager::find() takes a non-nullable int. Twig's
+    compiled templates run in coercive mode, but coercive mode still refuses
+    null → int for a userland method: it raises a TypeError rather than quietly
+    passing 0 or returning null. Unguarded, this line 500s the detail page for
+    every search-kind evaluation.
+  #}
+  {% set trial = evaluation.trialId ? trialsManager.find(evaluation.trialId) : null %}
   <p><a href="{{ path('lumina_ui_evaluation_index') }}">&larr; All evaluations</a></p>
 
   <h1>
@@ -31,7 +40,17 @@
         </a>
       </td></tr>
       <tr><th scope="row">Trial</th><td>
-        <a href="{{ path('lumina_ui_trial_show', {trialId: evaluation.trialId}) }}">{{ trial.officialTitle ?? evaluation.trialId }}</a>
+        {#
+          The link needs the same guard as the lookup above, for a second
+          reason: lumina_ui_trial_show requires trialId to match \d+, so
+          generating it with null throws "Parameter must match \d+" — the URL
+          generator refuses before the page ever renders.
+        #}
+        {% if evaluation.trialId %}
+          <a href="{{ path('lumina_ui_trial_show', {trialId: evaluation.trialId}) }}">{{ trial.officialTitle ?? evaluation.trialId }}</a>
+        {% else %}
+          <span class="muted">All trials</span>
+        {% endif %}
         {# evaluation.trialId ? links.external(exact_url, 'trials/trial/' ~ evaluation.trialId ~ '/change/', evaluation.trialId) : '—' #}
       </td></tr>
       <tr><th scope="row">Trial Disease</th><td>{{ evaluation.disease ?? '—' }}</td></tr>

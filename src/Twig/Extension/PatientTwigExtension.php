@@ -20,6 +20,7 @@ class PatientTwigExtension extends AbstractExtension {
   public function getFunctions(): array {
     return [
       new TwigFunction('find_patient', [LuminaTwig\Runtime\PatientTwigExtensionRuntime::class, 'findPatient']),
+      new TwigFunction('get_trials_manager', [LuminaTwig\Runtime\PatientTwigExtensionRuntime::class, 'getTrialsManager']),
     ];
   }
 }

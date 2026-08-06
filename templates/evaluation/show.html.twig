@@ -3,6 +3,8 @@
 {% block page_title %}Evaluation #{{ evaluation.id }}{% endblock %}
 
 {% block content %}
+  {% set trialsManager = get_trials_manager() %}
+  {% set trial = trialsManager.find(evaluation.trialId) %}
   <p><a href="{{ path('lumina_ui_evaluation_index') }}">&larr; All evaluations</a></p>
 
   <h1>
@@ -21,8 +23,17 @@
   <table>
     <caption>Run details</caption>
     <tbody>
-      <tr><th scope="row">Patient</th><td>{{ evaluation.patientName ?? '—' }} ({{ links.external(ctomop_url, 'patient/' ~ evaluation.personId, evaluation.personId) }})</td></tr>
-      <tr><th scope="row">Trial</th><td>{{ evaluation.trialId ? links.external(exact_url, 'trials/trial/' ~ evaluation.trialId ~ '/change/', evaluation.trialId) : '—' }}</td></tr>
+      <tr><th scope="row">Patient</th><td>
+        {# evaluation.patientName ?? '—' }} ({{ links.external(ctomop_url, 'patient/' ~ evaluation.personId, evaluation.personId) }})#}
+        <a href="{{ path('lumina_ui_patient_show', {personId: evaluation.personId}) }}">
+          {{ evaluation.patientName ?? '—' }}
+          <span class="muted">({{ links.external(ctomop_url, 'patient/' ~ evaluation.personId, evaluation.personId) }})</span>
+        </a>
+      </td></tr>
+      <tr><th scope="row">Trial</th><td>
+        <a href="{{ path('lumina_ui_trial_show', {trialId: evaluation.trialId}) }}">{{ trial.officialTitle ?? evaluation.trialId }}</a>
+        {# evaluation.trialId ? links.external(exact_url, 'trials/trial/' ~ evaluation.trialId ~ '/change/', evaluation.trialId) : '—' #}
+      </td></tr>
       <tr><th scope="row">Trial Disease</th><td>{{ evaluation.disease ?? '—' }}</td></tr>
       <tr><th scope="row">Software</th><td>{{ evaluation.software.label }}</td></tr>
       <tr><th scope="row">Kind</th><td>{{ evaluation.kind.label }}</td></tr>

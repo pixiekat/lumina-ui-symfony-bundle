@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Pixiekat\LuminaUiBundle\Twig\Runtime;
 
-use Pixiekat\LuminaUiBundle\Interfaces\Service\PatientManagerInterface;
+use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
 use Pixiekat\LuminaUiBundle\ReadModel\Patient;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -56,8 +56,19 @@ class PatientTwigExtensionRuntime implements RuntimeExtensionInterface {
 
   public function __construct(
     private readonly CacheInterface $cache,
-    private readonly PatientManagerInterface $patientManager,
+    private readonly PixieInterfaces\Service\PatientManagerInterface $patientManager,
+    private readonly PixieInterfaces\Service\TrialsManagerInterface $trialsManager,
   ) {}
+
+  /**
+   * Expose the TrialsManager to Twig templates.
+   *
+   * This is a convenience for templates that want to link to a trial's detail
+   * page. The controller already has the TrialsManager, but Twig does not.
+   */
+  public function getTrialsManager(): PixieInterfaces\Service\TrialsManagerInterface {
+    return $this->trialsManager;
+  }
 
   /**
    * Resolves one ctomop patient for a template, or null when the id is unknown.

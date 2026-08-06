@@ -1,0 +1,143 @@
+{#
+  One trial's results — every evaluation run against it, best match first.
+
+  "Match" here means an attribute EXACT reported with status `matched` in the
+  explain_trial_match breakdown; the ranking is that count, descending. The
+  matched / not matched / unknown columns are shown side by side rather than
+  reduced to a single score, because they mean different things: unknowns are a
+  data-quality signal (CTOMOP had nothing to compare), not a negative verdict.
+
+  Read-only and script-free, like the index it links back from.
+#}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}{{ trial ? trial.displayTitle : 'Trial #' ~ trialId }} — results{% endblock %}
+
+{% block content %}
+  <p><a href="{{ path('lumina_ui_trial_index') }}">&larr; All trials</a></p>
+
+  <h1>Trial results</h1>
+
+  {#
+    The trial summary card. `trial` is null when exact_db is unreachable or the
+    trial has since been removed — the evaluations below are ours and stay
+    readable either way, so this degrades to a short explanation instead of
+    taking the page down.
+  #}
+  <div class="trial-summary">
+    {% if trial %}
+      <h2>{{ trial.displayTitle }}</h2>
+      <dl class="trial-meta">
+        <div><dt>Study ID</dt><dd>{{ trial.studyId ?? '—' }}</dd></div>
+        <div><dt>Phase</dt><dd>{{ trial.phaseLabel ?? '—' }}</dd></div>
+        <div><dt>Sponsor</dt><dd>{{ trial.sponsorName ?? '—' }}</dd></div>
+        <div><dt>Eligible ages</dt><dd>{{ trial.ageRangeLabel ?? 'Any age' }}</dd></div>
+        <div><dt>Condition</dt><dd>{{ trial.disease ?? '—' }}</dd></div>
+        <div>
+          <dt>Trial record</dt>
+          <dd>{{ links.external(exact_url, 'trials/trial/' ~ trial.id ~ '/change/', trial.id) }}</dd>
+        </div>
+      </dl>
+      {% if trial.link %}
+        <p><a href="{{ trial.link }}" rel="noopener noreferrer" target="_blank">
+          View on {{ trial.register ?? 'the registry' }} (opens in a new tab)
+        </a></p>
+      {% endif %}
+    {% else %}
+      <h2>Trial #{{ trialId }}</h2>
+      <p class="muted">
+        This trial could not be read from the trials database — it may have been
+        removed, or <code>TRIALS_DATABASE_URL</code> may point at a different
+        database. The evaluation results below are unaffected.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="actions">
+    <a class="button" href="{{ path('lumina_ui_evaluation_new', {trial: trialId}) }}">Queue more patients</a>
+    <a class="button button--secondary" href="{{ path('lumina_ui_trial_index') }}">Back to trials</a>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <caption>
+        {{ total }} evaluation{{ total == 1 ? '' : 's' }} · page {{ page }} of {{ pages }} ·
+        sorted by matched attributes, highest first
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Patient</th>
+          <th scope="col">Matched</th>
+          <th scope="col">Not matched</th>
+          <th scope="col">Unknown</th>
+          <th scope="col">Status</th>
+          <th scope="col">Run At</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in evaluations %}
+          <tr>
+            <td>{{ e.id }}</td>
+            <td>{{ e.patientName ?? '—' }}
+              <span class="muted">({{ links.external(ctomop_url, 'patient/' ~ e.personId, e.personId) }})</span></td>
+            <td>
+              {# "7 of 12" rather than a bare 7: the denominator varies by trial,
+                 so the raw count alone is not comparable and reads as a score
+                 out of nothing. #}
+              {% if e.attributeCount > 0 %}
+                {{ e.matchedCount }} <span class="muted">of {{ e.attributeCount }}</span>
+              {% else %}
+                {# No breakdown at all — the run has not finished, or it failed
+                   before producing parseable output. #}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ e.attributeCount > 0 ? e.notMatchedCount : '—' }}</td>
+            <td>{{ e.attributeCount > 0 ? e.unknownCount : '—' }}</td>
+            <!--<td>
+              {# summary is schemaless JSON and is null until a run finishes, so
+                 both the column AND the key can be absent. Twig's `??` handles
+                 both cases; the `default` FILTER does not — it is built on the
+                 `defined` test, which refuses to walk an attribute chain. #}
+              {{ e.summary.overallCtomop ?? '—' }}
+            </td>-->
+            <td><span class="badge badge--{{ e.status.value }}">{{ e.status.label }}</span></td>
+            <td>
+              {% if e.ranAt %}
+                <time datetime="{{ e.ranAt|date('c') }}">{{ e.ranAt|date('Y-m-d H:i') }}</time>
+              {% else %}
+                <span class="muted">queued {{ e.createdAt|date('Y-m-d H:i') }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">
+                View Result<span class="visually-hidden"> for evaluation {{ e.id }}</span>
+              </a>
+              · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
+                JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pages > 1 %}
+    <nav class="pagination" aria-label="Result pages">
+      {% if page > 1 %}
+        <a href="{{ path('lumina_ui_trial_show', {trialId: trialId, page: page - 1}) }}" rel="prev">← Previous</a>
+      {% else %}
+        <span class="muted" aria-hidden="true">← Previous</span>
+      {% endif %}
+      <span>Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}
+        <a href="{{ path('lumina_ui_trial_show', {trialId: trialId, page: page + 1}) }}" rel="next">Next →</a>
+      {% else %}
+        <span class="muted" aria-hidden="true">Next →</span>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

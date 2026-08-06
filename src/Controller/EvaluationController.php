@@ -46,7 +46,7 @@ class EvaluationController extends AbstractController {
   ) {}
 
   /** The landing page: a paginated table of standalone evaluations. */
-  #[Route('/', name: 'lumina_ui_evaluation_index', methods: ['GET'])]
+  #[Route('/evaluations', name: 'lumina_ui_evaluation_index', methods: ['GET'])]
   public function index(Request $request): Response {
     $perPage = 25;
     $page = max(1, $request->query->getInt('page', 1));

@@ -92,6 +92,7 @@
           <th scope="col">Condition</th>
           <th scope="col">ECOG</th>
           <th scope="col">Status</th>
+          <th scope="col">Last Evaluated</th>
           <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
@@ -132,8 +133,18 @@
                 {# The badge carries the word, not just a colour — colour alone
                    fails for colour-blind users and in high-contrast modes. #}
                 <span class="badge badge--{{ evaluation.status.value }}">{{ evaluation.status.label }}</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if evaluation is null %}
+                <span class="muted"></span>
+              {% else %}
+                {# The badge carries the word, not just a colour — colour alone
+                   fails for colour-blind users and in high-contrast modes. #}
+                <span class="muted">{{ evaluation.getRanAt|date('Y-m-d H:i:s') }}</span>
                 <a href="{{ path('lumina_ui_evaluation_show', {id: evaluation.id}) }}">
-                  <span class="visually-hidden">View evaluation for {{ patient.displayName }}, </span>#{{ evaluation.id }}
+                  <span class="visually-hidden">View evaluation for {{ patient.displayName }}, </span> View Result
                 </a>
               {% endif %}
             </td>

@@ -1,0 +1,117 @@
+{#
+  Trials — evaluations grouped by the trial they were run against.
+
+  One row per trial, answering "have we looked at this one, how much, and how
+  recently". The "View" column drills into trial/show.html.twig for the ranked
+  results.
+
+  Plain HTML throughout: links to navigate, no forms, nothing that needs
+  JavaScript. Every row is readable and every control usable with scripting off.
+#}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% import '@LuminaUi/_links.html.twig' as links %}
+{% block page_title %}Trials{% endblock %}
+
+{% block content %}
+  <h1>Trials</h1>
+  <p>
+    Distinct trials that have been evaluated, sorted by the most recent evaluation. Each row shows how many evaluations have been run against that trial. Clicking view will show you all patients run under that trial.
+  </p>
+
+  <div class="actions">
+    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">All evaluations</a>
+    <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+  </div>
+
+  {% if total == 0 %}
+    <p class="muted">
+      No trials have been evaluated yet. Start one with “New evaluation” — this
+      page fills in as soon as the first run is queued.
+    </p>
+  {% else %}
+    <div class="table-wrap">
+      <table>
+        <caption>
+          {{ total }} trial{{ total == 1 ? '' : 's' }} with evaluations · page {{ page }} of {{ pages }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Trial number</th>
+            <th scope="col">Trial name</th>
+            {# Numeric columns get a scope AND a right-ish reading order in the
+               data cells below; the abbreviation is spelled out for anyone whose
+               screen reader announces the header before each cell. #}
+            <th scope="col">Evaluations</th>
+            <th scope="col">Last run</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+            <tr>
+              <td>
+                {# The study id (NCT…) is what a human recognises a trial by, so
+                   lead with it and keep the internal id as the link target into
+                   the EXACT admin. When exact_db is unreachable we have neither,
+                   and fall back to the bare id we stored ourselves. #}
+                {% if group.trial and group.trial.studyId %}
+                  {{ group.trial.studyId }}
+                  <span class="muted">({{ links.external(exact_url, 'trials/trial/' ~ group.trialId ~ '/change/', group.trialId) }})</span>
+                {% else %}
+                  {{ links.external(exact_url, 'trials/trial/' ~ group.trialId ~ '/change/', group.trialId) }}
+                {% endif %}
+              </td>
+              <td>
+                {# Same multibyte-safe truncation as the trial picker: Twig's
+                   `length` and `slice` use mb_* under the hood, so this cannot
+                   split a character in half. #}
+                {% set title = group.displayTitle %}
+                {{ title|length > 110 ? title|slice(0, 110) ~ '…' : title }}
+              </td>
+              <td>{{ group.evaluationCount }}</td>
+              <td>
+                {% set when = group.displayDate %}
+                {% if when %}
+                  <time datetime="{{ when|date('c') }}">{{ when|date('Y-m-d H:i') }}</time>
+                  {# Say WHICH date this is when it is not a completed run.
+                     A queue time printed silently under a "Last run" heading
+                     would read as a finished run that it is not. #}
+                  {% if not group.hasFinishedRun %}
+                    <span class="muted">(queued, not finished)</span>
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {# The accessible name names the trial: a screen reader's link
+                   list of twenty-five identical "View" links is unusable. #}
+                <a class="button" href="{{ path('lumina_ui_trial_show', {trialId: group.trialId}) }}">
+                  View<span class="visually-hidden"> results for trial {{ group.trial.studyId ?? group.trialId }}</span>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+      <nav class="pagination" aria-label="Trial pages">
+        {% if page > 1 %}
+          <a href="{{ path('lumina_ui_trial_index', {page: page - 1}) }}" rel="prev">← Previous</a>
+        {% else %}
+          {# Rendered as inert text rather than omitted, so the controls do not
+             shift position between pages. #}
+          <span class="muted" aria-hidden="true">← Previous</span>
+        {% endif %}
+        <span>Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}
+          <a href="{{ path('lumina_ui_trial_index', {page: page + 1}) }}" rel="next">Next →</a>
+        {% else %}
+          <span class="muted" aria-hidden="true">Next →</span>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% endif %}
+{% endblock %}

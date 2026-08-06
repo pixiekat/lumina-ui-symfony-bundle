@@ -134,6 +134,92 @@ class EvaluationRepository extends ServiceEntityRepository {
       ->getSingleScalarResult();
   }
 
+  /**
+   * One row per trial that has ever been evaluated, with its run counts.
+   *
+   * This is the whole data set behind the "Trials" index — the grouped view that
+   * answers "which trials have we actually run, and when did we last touch them?"
+   * without loading a single Evaluation object.
+   *
+   * ── Why a scalar aggregate rather than hydrated entities ───────────────────
+   * The alternative is findAll() plus grouping in PHP, which pulls every row —
+   * including the two TEXT columns (`raw_output` is whole console captures) — just
+   * to throw them away after counting. GROUP BY does the arithmetic in the
+   * database and returns a handful of rows. It also means the page cost stays
+   * flat as the evaluation table grows.
+   *
+   * Rows with a null trialId are the `search_trials_for_patients` kind: one
+   * patient across ALL trials, so they have no trial to group under. They are
+   * excluded here and remain visible via the batches screens.
+   *
+   * ── The shape you get back ─────────────────────────────────────────────────
+   * Aggregate functions bypass Doctrine's type conversion: MAX() over a
+   * datetime_immutable column comes back as the DRIVER's value — a raw
+   * 'YYYY-MM-DD HH:II:SS' string on Postgres, not a \DateTimeImmutable. Callers
+   * must convert; ReadModel\TrialEvaluationGroup::fromAggregateRow() is the one
+   * place that does, so the parsing rule lives in exactly one file.
+   *
+   * @return list<array{trialId: int, evaluationCount: int, lastRanAt: ?string, lastQueuedAt: ?string}>
+   */
+  public function findTrialGroups(): array {
+    return $this->createQueryBuilder('e')
+      ->select(
+        'e.trialId AS trialId',
+        'COUNT(e.id) AS evaluationCount',
+        // Actual completion time. Null for a trial whose runs are all still
+        // pending — hence the second aggregate below as a fallback.
+        'MAX(e.ranAt) AS lastRanAt',
+        'MAX(e.createdAt) AS lastQueuedAt',
+      )
+      ->andWhere('e.trialId IS NOT NULL')
+      ->groupBy('e.trialId')
+      // Ordering by the SELECT alias (a DQL "result variable") rather than by
+      // MAX(...) again: one definition, and no risk of the two drifting apart.
+      // Newest activity first, with trialId as the tiebreaker so the order is
+      // total — without it, two trials queued in the same second could swap
+      // places between requests and a pager would repeat or skip rows.
+      ->orderBy('lastQueuedAt', 'DESC')
+      ->addOrderBy('trialId', 'DESC')
+      ->getQuery()
+      ->getResult();
+  }
+
+  /**
+   * Every evaluation recorded against ONE trial, newest first.
+   *
+   * Deliberately NOT sorted by match count here, and deliberately not paginated:
+   * the "matches" a result is ranked by are a count of entries inside the
+   * `attributes` JSON column, and neither DQL nor a portable SQL expression can
+   * ORDER BY that. The controller sorts the hydrated rows in PHP — see
+   * TrialController::show().
+   *
+   * ── What that costs, and when to change it ─────────────────────────────────
+   * The bound is (patients × re-runs) for a single trial: a few hundred rows in
+   * this deployment, which is nothing. It does mean the whole set is materialised
+   * before a page of it is shown, so if a trial ever accumulates tens of
+   * thousands of runs, the Postgres-native replacement is to sort in the database
+   * over raw DBAL:
+   *
+   *     ORDER BY (
+   *       SELECT count(*) FROM jsonb_array_elements(e.attributes::jsonb) a
+   *       WHERE a->>'status' = 'matched'
+   *     ) DESC
+   *
+   * — correct but Postgres-only, and worth an expression index at that size. Do
+   * not reach for it before the row count justifies losing the portability.
+   *
+   * @return Evaluation[]
+   */
+  public function findByTrial(int $trialId): array {
+    return $this->createQueryBuilder('e')
+      ->andWhere('e.trialId = :trial')
+      ->setParameter('trial', $trialId)
+      ->orderBy('e.createdAt', 'DESC')
+      ->addOrderBy('e.id', 'DESC')
+      ->getQuery()
+      ->getResult();
+  }
+
   /** Persist + flush a single evaluation. Small convenience for handlers/controllers. */
   public function save(Evaluation $evaluation, bool $flush = true): void {
     $em = $this->getEntityManager();

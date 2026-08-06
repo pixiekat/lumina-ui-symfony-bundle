@@ -257,4 +257,75 @@ class Evaluation {
     $this->durationMs = $durationMs;
     return $this;
   }
+
+  // --- Derived attribute counts --------------------------------------------
+  //
+  // `attributes` is the explain_trial_match per-attribute breakdown: a list of
+  // { name, status, ctomop, cb, differs } where status is one of
+  // "matched" / "not_matched" / "unknown" (see Service\OutputParser::parseExplain).
+  //
+  // These helpers answer "how well did this patient match?" in ONE number, which
+  // is what the per-trial results table sorts on. They live on the entity rather
+  // than in a controller or a Twig filter because they are derived purely from
+  // this row's own data — anything that holds an Evaluation can ask, and there is
+  // exactly one definition of "a match" in the codebase.
+  //
+  // ── Why this is not a database column ──────────────────────────────────────
+  // A stored `matched_count` would be denormalisation: a second copy of a fact
+  // the JSON already contains, which can drift if a re-parse ever changes the
+  // breakdown. Counting in PHP over a few dozen array entries is free. The point
+  // where that stops being true is sorting *across* rows in SQL — see the note on
+  // EvaluationRepository::findByTrial() for what to do then.
+
+  /**
+   * How many attributes came back with the given parser status.
+   *
+   * Defensive on every axis, because `attributes` is schemaless JSON: a null
+   * column, a non-list payload, or an entry missing its `status` key all count as
+   * zero rather than throwing. A malformed row should cost you one number, not
+   * the whole page it appears on.
+   *
+   * @param string $status One of "matched", "not_matched", "unknown".
+   */
+  public function countAttributesWithStatus(string $status): int {
+    if (!is_array($this->attributes)) {
+      return 0;
+    }
+
+    $count = 0;
+    foreach ($this->attributes as $attribute) {
+      if (is_array($attribute) && ($attribute['status'] ?? null) === $status) {
+        $count++;
+      }
+    }
+
+    return $count;
+  }
+
+  /** Attributes EXACT reported as matching. The headline "match" number. */
+  public function getMatchedCount(): int {
+    return $this->countAttributesWithStatus('matched');
+  }
+
+  /** Attributes EXACT reported as NOT matching. */
+  public function getNotMatchedCount(): int {
+    return $this->countAttributesWithStatus('not_matched');
+  }
+
+  /**
+   * Attributes EXACT could not decide on — usually missing CTOMOP data.
+   *
+   * Worth showing next to the match count rather than folding into "not matched":
+   * "3 of 12 matched, 8 unknown" is a data-quality problem, whereas
+   * "3 of 12 matched, 8 did not" is a genuine eligibility answer. Collapsing them
+   * would hide the difference.
+   */
+  public function getUnknownCount(): int {
+    return $this->countAttributesWithStatus('unknown');
+  }
+
+  /** Total attributes in the breakdown — the denominator for the match count. */
+  public function getAttributeCount(): int {
+    return is_array($this->attributes) ? count($this->attributes) : 0;
+  }
 }

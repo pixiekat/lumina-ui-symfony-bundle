@@ -52,15 +52,15 @@
   {% endif %}
 
   {% if evaluation.attributes %}
-    <h2>Attribute breakdown ({{ evaluation.attributes|length }})</h2>
+    <h2>Trial match breakdown ({{ evaluation.attributes|length }})</h2>
     <div class="table-wrap">
       <table>
-        <caption>CTOMOP-derived attributes for this patient × trial</caption>
+        <caption>Shows whether or not the patient matched the trial attribute criteria for this trial.</caption>
         <thead>
           <tr>
-            <th scope="col">Attribute</th>
-            <th scope="col">Status</th>
-            <th scope="col">CTOMOP value</th>
+            <th scope="col">Trial Match Attribute</th>
+            <th scope="col">Matched/Not Matched</th>
+            <th scope="col">Patient Value</th>
           </tr>
         </thead>
         <tbody>

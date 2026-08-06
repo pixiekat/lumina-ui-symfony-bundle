@@ -131,7 +131,7 @@
         <thead>
           <tr>
             <th scope="col">Trial Match Attribute</th>
-            <th scope="col">Matched/Not Matched</th>
+            <th scope="col">Matched?</th>
             <th scope="col">Patient Value</th>
           </tr>
         </thead>
@@ -141,9 +141,9 @@
               <td>{{ attr.name }}</td>
               <td>
                 {% if attr.status == 'matched' %}
-                  <span class="badge bg-success">Matched</span> ✅
+                  <span class="badge bg-success">Matched</span>
                 {% elseif attr.status == 'not_matched' %}
-                  <span class="badge bg-danger">Not Matched</span> ❌
+                  <span class="badge bg-danger">Not Matched</span>
                 {% else %}
                   <span class="badge bg-secondary">Unknown</span>
                 {% endif %}

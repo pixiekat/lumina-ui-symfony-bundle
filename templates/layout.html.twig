@@ -74,14 +74,15 @@
   <header>
     <nav aria-label="Primary">
       <a href="{{ path('lumina_ui_trial_index') }}">Trials</a>
-      <a href="{{ path('lumina_ui_evaluation_index') }}">All Evaluations</a>
-      <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a>
-      {% if exact_url is defined %}
+      <a href="{{ path('lumina_ui_patient_index') }}">Patients</a>
+      <a href="{{ path('lumina_ui_evaluation_index') }}">Evaluations</a>
+      {# <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a> #}
+      {#{% if exact_url is defined %}
         <a href="{{ exact_url }}" rel="noopener noreferrer" target="_blank">Exact Admin (external)</a>
       {% endif %}
       {% if ctomop_url is defined %}
         <a href="{{ ctomop_url }}" rel="noopener noreferrer" target="_blank">CTOMOP (external)</a>
-      {% endif %}
+      {% endif %}#}
     </nav>
   </header>
   <main id="main">

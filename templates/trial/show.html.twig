@@ -16,7 +16,7 @@
 {% block content %}
   <p><a href="{{ path('lumina_ui_trial_index') }}">&larr; All trials</a></p>
 
-  <h1>Trial results</h1>
+  <h1>Evaluations for trial #{{ trialId }}: {{ trial ? trial.displayTitle : 'Trial #' ~ trialId }}</h1>
 
   {#
     The trial summary card. `trial` is null when exact_db is unreachable or the

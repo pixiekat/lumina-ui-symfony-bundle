@@ -23,7 +23,7 @@
 {% block content %}
   <p><a href="{{ path('lumina_ui_patient_index') }}">&larr; All patients</a></p>
 
-  <h1>Patient runs</h1>
+  <h1>Evaluations for patient #{{ personId }}: {{ patient ? patient.displayName : 'Patient #' ~ personId }}</h1>
 
   {#
     The patient summary card. `patient` is null when ctomop is unreachable or the

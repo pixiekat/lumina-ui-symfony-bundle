@@ -1,0 +1,174 @@
+{#
+  The trial queue table for one patient — the mirror of _patient_rows.html.twig.
+
+  Expects: patient, trials (keyed by trial id), latest (evaluations keyed by
+           trial id), counts, remaining, hasActive.
+
+  ── The rule this table follows ──────────────────────────────────────────────
+  Identical to the patient-first table, because it is the same rule read along
+  the other axis. A row's action is DERIVED from the data, never remembered by
+  the browser:
+
+      no evaluation          → offer "Queue"
+      pending / running      → show the status, offer nothing
+      completed / failed     → show the status, offer "Re-run"
+
+  So the button genuinely disappears after queueing and stays gone across a
+  refresh, a back-navigation, or someone else queueing the same pairing in
+  another tab.
+
+  ── What the queue form posts ────────────────────────────────────────────────
+  Exactly what the trial-first table posts: trial_id, person_id and a CSRF token
+  scoped to that pair, to the same /evaluations/queue endpoint. The only addition
+  is the hidden `flow` field, which does nothing but tell the controller which
+  screen to send you back to. Two ways in, one way to queue — which is what makes
+  comparing the two flows a comparison of the interface rather than of the
+  behaviour underneath it.
+#}
+{#
+  data-active is the poller's stop signal, and it is deliberately INSIDE the
+  frame: Turbo replaces a frame's children, never the frame element's own
+  attributes, so a flag on the wrapper would freeze at its first-render value and
+  the loop would never terminate.
+#}
+<div class="status-summary"
+     data-evaluation-poll-target="state"
+     data-active="{{ hasActive ? 'true' : 'false' }}">
+  {#
+    ONE polite live region for the whole table, not one per cell — 180 trials
+    means 180 individually-changing status cells, which is unusable noise in a
+    screen reader. A single sentence saying what changed is genuinely useful.
+  #}
+  <p aria-live="polite" aria-atomic="true" class="muted">
+    {% if counts.queued == 0 %}
+      No evaluations queued for this patient yet.
+    {% else %}
+      {{ counts.queued }} of {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }} queued ·
+      {{ counts.active }} in progress ·
+      {{ counts.completed }} completed{% if counts.failed > 0 %} · {{ counts.failed }} failed{% endif %}.
+    {% endif %}
+  </p>
+
+  {#
+    Bulk queue. Inside the frame, next to the counts it depends on, so the number
+    on the button stays truthful as rows are queued elsewhere rather than going
+    stale at whatever it was when the page first loaded.
+
+    Only ever queues trials with NO evaluation yet — never re-runs a finished
+    one — so the button is safe to press twice: the second press finds nothing
+    remaining and says so.
+  #}
+  {% if remaining > 0 %}
+    <form method="post" action="{{ path('lumina_ui_evaluation_queue_all_trials') }}"
+          onsubmit="return confirm('Queue evaluations against {{ remaining }} trial{{ remaining == 1 ? '' : 's' }} for this patient?');">
+      <input type="hidden" name="_token" value="{{ csrf_token('queue-all-patient-' ~ patient.personId) }}">
+      <input type="hidden" name="person_id" value="{{ patient.personId }}">
+      <button type="submit">
+        Queue all {{ remaining }} remaining trial{{ remaining == 1 ? '' : 's' }}
+      </button>
+      {# The confirm() is an enhancement, not a guard — with JavaScript off it
+         does not fire and the form posts. The action is idempotent in the ways
+         that matter, so that is a trade rather than a hole. #}
+    </form>
+  {% elseif trials is not empty %}
+    <p class="muted">This patient has an evaluation against every trial. Use “Re-run” on a row to run one again.</p>
+  {% endif %}
+</div>
+
+{% if trials is empty %}
+  <p class="muted">
+    No trials found. Check that the trials database is reachable and that
+    <code>TRIALS_DATABASE_URL</code> points at the right database.
+  </p>
+{% else %}
+  <div class="table-wrap">
+    <table>
+      <caption>
+        {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }} ·
+        queue {{ patient.displayName }} against each one
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Study</th>
+          <th scope="col">Title</th>
+          <th scope="col">Phase</th>
+          <th scope="col">Sponsor</th>
+          <th scope="col">Status</th>
+          <th scope="col">Last Evaluated</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for trial in trials %}
+          {% set evaluation = latest[trial.id] ?? null %}
+          {# The id is the redirect target after queueing, so the browser puts
+             you back on this row instead of the top of the page. #}
+          <tr id="trial-{{ trial.id }}">
+            <th scope="row">
+              {{ trial.studyId ?? '—' }}
+              <span class="muted">({{ trial.id }})</span>
+            </th>
+
+            {# Twig's core `length` and `slice` are multibyte-aware (mb_strlen /
+               mb_substr), so this cannot split a character in half the way PHP's
+               substr() would. Same truncation as the trial picker. #}
+            {% set title = trial.displayTitle %}
+            <td>{{ title|length > 90 ? title|slice(0, 90) ~ '…' : title }}</td>
+
+            <td>{{ trial.phaseLabel ?? '—' }}</td>
+            <td>{{ trial.sponsorName ?? '—' }}</td>
+
+            <td>
+              {% if evaluation is null %}
+                <span class="muted">Not queued</span>
+              {% else %}
+                {# The badge carries the word, not just a colour — colour alone
+                   fails for colour-blind users and in high-contrast modes. #}
+                <span class="badge badge--{{ evaluation.status.value }}">{{ evaluation.status.label }}</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if evaluation is null %}
+                <span class="muted"></span>
+              {% else %}
+                <span class="muted">{{ evaluation.ranAt ? evaluation.ranAt|date('Y-m-d H:i:s') : '—' }}</span>
+                <a href="{{ path('lumina_ui_evaluation_show', {id: evaluation.id}) }}">
+                  <span class="visually-hidden">View evaluation against {{ trial.studyId ?? trial.id }}, </span> View Result
+                </a>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if evaluation is null or evaluation.status.isTerminal %}
+                <form method="post" action="{{ path('lumina_ui_evaluation_queue') }}" class="inline">
+                  {# Token scoped to this trial AND this patient — the SAME scheme
+                     the trial-first table uses, so both screens post forms the one
+                     queue endpoint validates identically. #}
+                  <input type="hidden" name="_token"
+                         value="{{ csrf_token('queue-' ~ trial.id ~ '-' ~ patient.personId) }}">
+                  <input type="hidden" name="trial_id" value="{{ trial.id }}">
+                  <input type="hidden" name="person_id" value="{{ patient.personId }}">
+                  {# Return here, not to the trial-first screen. This field affects
+                     the redirect and nothing else. #}
+                  <input type="hidden" name="flow" value="patient">
+                  <button type="submit">
+                    {{ evaluation is null ? 'Queue' : 'Re-run' }}
+                    {# 180 buttons all named "Queue" are impossible to tell apart
+                       in a screen reader's element list. #}
+                    <span class="visually-hidden">evaluation against {{ trial.studyId ?? ('trial ' ~ trial.id) }}</span>
+                  </button>
+                </form>
+              {% else %}
+                <span class="muted">
+                  Queued
+                  <span class="visually-hidden">— no action available for {{ trial.studyId ?? ('trial ' ~ trial.id) }} while it runs</span>
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

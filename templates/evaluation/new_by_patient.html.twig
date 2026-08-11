@@ -1,0 +1,170 @@
+{#
+  New evaluation, patient-first — the mirror of new.html.twig.
+
+    no ?patient   → stage 1: pick a patient from the list
+    ?patient=NNN  → stage 2: that patient, plus every trial with a Queue button
+
+  Both stages are ordinary HTML: links to navigate, one small POST form per row
+  to queue. Nothing here needs JavaScript; the trial table is wrapped in a
+  <turbo-frame> that polls for status changes, and the "Refresh statuses" link is
+  the whole fallback when that never runs.
+
+  ── Why this exists alongside the trial-first flow ───────────────────────────
+  The same job approached from the other end: "I have a patient in front of me,
+  which trials might they fit?" rather than "I have a trial, who fits it?". Both
+  screens post to the same queue endpoints with the same fields, so the pair can
+  be compared as interfaces without any difference in what actually gets queued.
+#}
+{% extends '@LuminaUi/layout.html.twig' %}
+{% block page_title %}{{ patient ? 'Queue evaluations' : 'Choose a patient' }}{% endblock %}
+
+{% block content %}
+  {% if patient is null %}
+
+    {# ── Stage 1: choose a patient ─────────────────────────────────────────── #}
+    <h1>New evaluation — choose a patient</h1>
+    <p class="muted">
+      Pick the patient you want to evaluate. The next screen lists every trial so
+      you can queue them one at a time.
+    </p>
+
+    <div class="actions">
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">Back to evaluations</a>
+      {# The other way round. Both entry points link to each other so neither is
+         reachable only by knowing its URL. #}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">Start from a trial instead</a>
+    </div>
+
+    {% if total == 0 %}
+      <p class="muted">
+        No patients found. Check that the patient database is reachable and that
+        <code>PATIENT_DATABASE_URL</code> is set correctly.
+      </p>
+    {% else %}
+      <div class="table-wrap">
+        <table>
+          <caption>{{ total }} patient{{ total == 1 ? '' : 's' }} · page {{ page }} of {{ pages }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Patient</th>
+              <th scope="col">Age</th>
+              <th scope="col">Condition</th>
+              <th scope="col">ECOG</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in patients %}
+              <tr>
+                <td>
+                  {{ p.displayName }}
+                  <span class="muted">({{ p.personId }})</span>
+                </td>
+
+                <td>
+                  {% set age = p.approximateAge %}
+                  {# "approx." is not padding: with only a birth year we can be a
+                     year out, and a clinical screen should not imply precision it
+                     lacks. #}
+                  {{ age is null ? '—' : 'approx. ' ~ age }}
+                </td>
+
+                <td>
+                  {% if p.hasClinicalSummary %}
+                    {{ p.disease ?? '—' }}{% if p.stage %} · stage {{ p.stage }}{% endif %}
+                  {% else %}
+                    <span class="muted">No clinical data recorded</span>
+                  {% endif %}
+                </td>
+
+                {# ECOG 0 is a real, meaningful score ("fully active") — test for
+                   null explicitly so it never renders as an em dash. #}
+                <td>{{ p.ecogPerformanceStatus is null ? '—' : p.ecogPerformanceStatus }}</td>
+
+                <td>
+                  {# The accessible name says WHICH patient — a list of identical
+                     "Select" links is unusable in a screen reader's link list. #}
+                  <a class="button" href="{{ path('lumina_ui_evaluation_new_by_patient', {patient: p.personId}) }}">
+                    Select<span class="visually-hidden"> patient {{ p.displayName }}</span>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pages > 1 %}
+        <nav class="pagination" aria-label="Patient pages">
+          {% if page > 1 %}
+            <a href="{{ path('lumina_ui_evaluation_new_by_patient', {page: page - 1}) }}" rel="prev">← Previous</a>
+          {% else %}
+            <span class="muted" aria-hidden="true">← Previous</span>
+          {% endif %}
+          <span>Page {{ page }} of {{ pages }}</span>
+          {% if page < pages %}
+            <a href="{{ path('lumina_ui_evaluation_new_by_patient', {page: page + 1}) }}" rel="next">Next →</a>
+          {% else %}
+            <span class="muted" aria-hidden="true">Next →</span>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% endif %}
+
+  {% else %}
+
+    {# ── Stage 2: queue trials against the chosen patient ──────────────────── #}
+    {% import '@LuminaUi/_links.html.twig' as links %}
+
+    <h1>Queue evaluations</h1>
+
+    {# Same panel class as the trial summary on the other flow, so the two stage-2
+       screens sit at the same visual weight. #}
+    <div class="trial-summary">
+      <h2>{{ patient.displayName }}</h2>
+      <dl class="trial-meta">
+        <div><dt>Person ID</dt><dd>{{ patient.personId }}</dd></div>
+        <div>
+          <dt>Age</dt>
+          <dd>{% set age = patient.approximateAge %}{{ age is null ? '—' : 'approx. ' ~ age }}</dd>
+        </div>
+        <div><dt>Condition</dt><dd>{{ patient.disease ?? '—' }}</dd></div>
+        <div><dt>Stage</dt><dd>{{ patient.stage ?? '—' }}</dd></div>
+        <div>
+          <dt>ECOG</dt>
+          <dd>{{ patient.ecogPerformanceStatus is null ? '—' : patient.ecogPerformanceStatus }}</dd>
+        </div>
+        <div>
+          <dt>Patient record</dt>
+          <dd>{{ links.external(ctomop_url, 'patient/' ~ patient.personId, patient.personId) }}</dd>
+        </div>
+      </dl>
+      {% if not patient.hasClinicalSummary %}
+        <p class="muted">
+          No clinical data recorded for this patient in ctomop — matching will have
+          little to work with, and most attributes will come back “unknown”.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="actions">
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">← Choose a different patient</a>
+      {#
+        The manual refresh. The poller sits on top of it, but this link stays: it
+        is the whole fallback story for a browser with JavaScript disabled, and it
+        costs one line to keep honest.
+      #}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new_by_patient', {patient: patient.personId}) }}">
+        Refresh statuses
+      </a>
+      <a class="button button--secondary" href="{{ path('lumina_ui_patient_show', {personId: patient.personId}) }}">
+        View this patient’s results
+      </a>
+    </div>
+
+    {# The frame wrapper, not the bare rows: same markup the poll endpoint
+       returns, so first render and refresh can never diverge. #}
+    {% include '@LuminaUi/evaluation/_trial_rows_frame.html.twig' %}
+
+  {% endif %}
+{% endblock %}

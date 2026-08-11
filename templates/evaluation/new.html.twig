@@ -24,6 +24,10 @@
 
     <div class="actions">
       <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">Back to evaluations</a>
+      {# The other way into the same job: pick a patient first, then queue trials.
+         Both entry points link to each other so neither is reachable only by
+         knowing its URL. #}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">Start from a patient instead</a>
     </div>
 
     {% if total == 0 %}

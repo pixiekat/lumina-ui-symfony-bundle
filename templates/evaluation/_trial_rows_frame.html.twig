@@ -1,0 +1,32 @@
+{#
+  The polling wrapper around the trial queue table — the mirror of
+  _patient_rows_frame.html.twig.
+
+  Rendered in BOTH places that show the table: inline from new_by_patient.html.twig
+  on first load, and on its own from the rows endpoint on every poll. Same
+  template both times, so the server-rendered markup and the refreshed markup
+  cannot drift apart.
+
+  Expects everything _trial_rows.html.twig expects, plus `patient`.
+
+  ── Same frame id as the other flow, on purpose ──────────────────────────────
+  Turbo matches a response's frame to the one on the page BY ID, and only one of
+  the two flows is ever on screen at a time. Reusing `evaluation-rows` means the
+  evaluation-poll Stimulus controller works here untouched — it reloads whatever
+  frame it is attached to and reads data-active from inside it, neither of which
+  cares which axis the table is showing. A second id would have bought nothing
+  and required the controller to learn about flows.
+
+  target="_top" for the same reason it is set on the other frame: without it,
+  every link and form in here would navigate *within* the frame, so the Queue
+  form's redirect would swallow its flash message (those live outside the frame)
+  and "View Result" would try to render a whole detail page inside a table cell.
+  Only the poller's programmatic reload() updates the frame.
+#}
+<turbo-frame id="evaluation-rows"
+             target="_top"
+             data-controller="evaluation-poll"
+             data-evaluation-poll-url-value="{{ path('lumina_ui_evaluation_new_by_patient_rows', {patient: patient.personId}) }}"
+             data-evaluation-poll-interval-value="5000">
+  {% include '@LuminaUi/evaluation/_trial_rows.html.twig' %}
+</turbo-frame>

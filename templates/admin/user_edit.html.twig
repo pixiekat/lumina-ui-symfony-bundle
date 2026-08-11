@@ -1,13 +1,19 @@
-{% extends '@LuminaUi/layout.html.twig' %}
-{% import '@LuminaUi/_links.html.twig' as links %}
+{#
+  Admin: edit a user. See user_add.html.twig for the data-turbo="false" note.
 
-{% block title %}Edit User{% endblock %}
+  The panel's title bar names the user rather than saying a generic "Edit User",
+  so the browser tab, the heading and the browser history entry all identify
+  WHICH user — which matters the moment two edit tabs are open.
+#}
+{% extends '@LuminaUi/admin/layout.html.twig' %}
+{% block admin_page_title %}Edit {{ user.displayName }}{% endblock %}
 
-{% block body %}
-  <h1>Editing User: {{ user.getDisplayName() }}</h1>
+{% block content %}
+  <div class="actions">
+    <a href="{{ path('admin_users_list') }}" class="button button--secondary">&larr; Back to Users</a>
+  </div>
 
   <div data-turbo="false">
-    <a href="{{ path('admin_users_list') }}">&larr; Back to Users List</a>
     {{ form_start(form) }}
       {{ form_widget(form) }}
       <button type="submit">Save Changes</button>

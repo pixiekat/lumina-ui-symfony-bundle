@@ -1,13 +1,20 @@
-{% extends '@LuminaUi/layout.html.twig' %}
-{% import '@LuminaUi/_links.html.twig' as links %}
+{#
+  Admin: create a user.
 
-{% block title %}Add User{% endblock %}
+  `data-turbo="false"` is kept from the original. Symfony's form component
+  re-renders the same URL with validation errors on failure, and Turbo would
+  need the response to opt in before it displayed that; switching Turbo off for
+  this subtree is the simplest way to keep server-side validation errors visible.
+#}
+{% extends '@LuminaUi/admin/layout.html.twig' %}
+{% block admin_page_title %}Add User{% endblock %}
 
-{% block body %}
-  <h1>Add User</h1>
+{% block content %}
+  <div class="actions">
+    <a href="{{ path('admin_users_list') }}" class="button button--secondary">&larr; Back to Users</a>
+  </div>
 
   <div data-turbo="false">
-    <a href="{{ path('admin_users_list') }}">&larr; Back to Users List</a>
     {{ form_start(form) }}
       {{ form_widget(form) }}
       <button type="submit">Add User</button>

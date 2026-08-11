@@ -86,6 +86,56 @@
        to fight the hover state or the badge colours. */
     tbody tr:nth-child(even) { background:#fafafa; }
     tbody tr:hover { background:#f5f7ff; }
+
+    /* ── Evaluator reviews ──────────────────────────────────────────────────
+       Verdict badges reuse the .badge base. As everywhere else in this
+       stylesheet the hue is a redundant cue only: every badge spells out
+       "Agree" or "Disagree" in words, because these two are the green/red pair
+       that collapses to one colour under deuteranopia. Deliberately the same
+       greens and reds as the completed/failed status badges rather than a new
+       pair — one palette, fewer colours to tell apart. */
+    .badge--agree    { background:#e7f6ec; border-color:#1a8a44; color:#0c5a2b; }
+    .badge--disagree { background:#fdeaea; border-color:#c0392b; color:#8a261b; }
+    /* The banner under the <h1>. Left rule rather than a filled panel: it marks
+       the block as a distinct kind of content without competing with the flash
+       messages sitting directly above it. */
+    .review-summary { border-left:4px solid var(--accent); background:#f7f9ff;
+                      padding:.75rem 1rem; border-radius:.4rem; margin:0 0 1.25rem; }
+    .review-summary h2 { font-size:1.05rem; margin:0 0 .35rem; }
+    .review-summary p { margin:.25rem 0; }
+    .review-tally { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+    .review-mine { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+    /* The form. Radios stack rather than sitting inline: a vertical list is
+       easier to hit accurately, which matters more than the horizontal space it
+       costs — and the label wraps the input, so the whole line is a click target
+       rather than just the 13px circle. */
+    .review-form { border-top:1px solid var(--line); margin:2rem 0 0; padding:1.5rem 0 0; }
+    .review-verdict { border:1px solid var(--line); border-radius:.4rem;
+                      padding:.75rem 1rem; margin:0 0 1rem; max-width:32rem; }
+    .review-verdict legend { font-weight:600; padding:0 .35rem; }
+    .review-option { display:flex; gap:.5rem; align-items:baseline; padding:.35rem 0; cursor:pointer; }
+    /* Match the .field input rule the layout already defines, so a select and a
+       textarea do not sit at a different size from the inputs beside them. */
+    .field select, .field textarea { font:inherit; padding:.45rem .6rem; width:100%;
+                                     border:1px solid var(--line); border-radius:.4rem; }
+    .field { max-width:32rem; }
+    .field-help { font-size:.85rem; margin:.25rem 0 0; }
+    .review-reason-help { margin:.5rem 0 0; font-size:.9rem; }
+    .review-reason-help dt { font-weight:600; margin-top:.4rem; }
+    .review-reason-help dd { margin:0 0 .25rem; color:var(--muted); }
+    /* The comment list. Each review is a card with a left rule, echoing the
+       summary banner so the two read as the same feature at opposite ends of
+       the page. */
+    .review-list { margin:2rem 0 0; }
+    .review { border:1px solid var(--line); border-left:4px solid var(--line);
+              border-radius:.4rem; padding:.75rem 1rem; margin:0 0 .75rem; }
+    /* Your own review, marked by weight and not by colour alone — the "(you)"
+       in the byline is what actually carries it. */
+    .review--mine { border-left-color:var(--accent); background:#f7f9ff; }
+    .review-byline { font-size:1rem; margin:0 0 .25rem; display:flex;
+                     flex-wrap:wrap; gap:.5rem; align-items:baseline; }
+    .review-meta { font-size:.85rem; margin:0 0 .5rem; }
+    .review-comment { margin:0; white-space:normal; }
   </style>
 {% endblock %}
 
@@ -96,6 +146,9 @@
       <a href="{{ path('lumina_ui_trial_index') }}">Trials</a>
       <a href="{{ path('lumina_ui_patient_index') }}">Patients</a>
       <a href="{{ path('lumina_ui_evaluation_index') }}">Evaluations</a>
+      {% if constant('Pixiekat\\LuminaUiBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_ACCESS_ADMIN_PANEL') %}
+        <a href="{{ path('admin_index') }}">Admin</a>
+      {% endif %}
       {# <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a> #}
       {#{% if exact_url is defined %}
         <a href="{{ exact_url }}" rel="noopener noreferrer" target="_blank">Exact Admin (external)</a>

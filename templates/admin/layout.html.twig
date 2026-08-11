@@ -1,0 +1,61 @@
+{#
+  Lumina's admin layout.
+
+  The control panel SHELL — the vB3 markup, the grid, the skin, the menu
+  renderer — lives in pixiekat/symfony-common-helpers, so every app that boots
+  that bundle gets the same panel. What is left here is the only part that is
+  actually Lumina's: what the header says, and what is in the menu.
+
+  Admin pages extend THIS, not the helper layout directly, so the branding and
+  the menu are declared once instead of once per page.
+
+  ── Why the menu is a {% set %} and not markup ─────────────────────────────
+  A top-level {% set %} in a child template runs before the parent renders, and
+  the parent's blocks see the result — so the menu can be declared as data and
+  the helper bundle never needs to know a single Lumina route name. Adding a
+  screen is one line below. If this ever needs to be built dynamically (filtered
+  per role, say), override {% block admin_nav %} instead; the helper layout
+  documents both routes.
+#}
+{% extends '@PixiekatSymfonyHelpers/admin/cp_layout.html.twig' %}
+
+{% set admin_nav_sections = [
+  {
+    label: 'Control Panel',
+    links: [
+      {route: 'admin_index', label: 'Home'},
+    ],
+  },
+  {
+    label: 'Users & Access',
+    links: [
+      {route: 'admin_users_list', label: 'Users', also: ['admin_user_edit']},
+      {route: 'admin_user_add', label: 'Add User'},
+    ],
+  },
+  {
+    label: 'Evaluator Review',
+    links: [
+      {route: 'admin_reviews_list', label: 'All Reviews'},
+      {route: 'admin_review_questions', label: 'Disagreement Reasons'},
+    ],
+  },
+  {
+    label: 'Lumina',
+    links: [
+      {route: 'lumina_ui_evaluation_index', label: 'Evaluations'},
+      {route: 'lumina_ui_trial_index', label: 'Trials'},
+      {route: 'lumina_ui_patient_index', label: 'Patients'},
+    ],
+  },
+] %}
+
+{% block admin_brand %}Lumina Control Panel{% endblock %}
+
+{% block admin_header_links %}
+  {% if app.user %}
+    <span>Logged in as <strong>{{ app.user.displayName }}</strong></span>
+  {% endif %}
+  <a href="{{ path('lumina_ui_trial_index_home') }}">Back to Lumina</a>
+  <a href="{{ path('pixiekat_symfony_helpers_logout') }}">Log out</a>
+{% endblock %}

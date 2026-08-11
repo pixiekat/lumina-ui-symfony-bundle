@@ -87,6 +87,49 @@ class EvaluationRepository extends ServiceEntityRepository {
   }
 
   /**
+   * The most recent evaluation for each TRIAL against ONE patient, keyed by
+   * trial id.
+   *
+   * The mirror image of findLatestByTrialIndexedByPerson(), and it drives the
+   * other half of the same idea: the "pick a patient, then queue trials" flow.
+   * Both screens ask the identical question — "what, if anything, has already
+   * been run for this pairing?" — just along different axes, and both derive the
+   * row's action from the answer rather than remembering it in the browser.
+   *
+   * ── The one difference from the trial-first version ────────────────────────
+   * The `trialId IS NOT NULL` guard. `search_trials_for_patients` rows cover the
+   * whole catalogue at once, so they have a person but no single trial. Looking
+   * along the trial axis they are invisible and irrelevant; looking along the
+   * patient axis they turn up in the result set and would collapse into a single
+   * bogus `$latest[null]` entry. Excluding them keeps this map strictly about
+   * per-trial explain runs, which is what the screen offers a button for.
+   *
+   * Same ASC-and-overwrite trick as its counterpart: ordered ascending and
+   * assigned in a loop so the highest id wins per trial. One query for the whole
+   * page, so trial count does not drive query count. If this table ever grows
+   * large, the Postgres-native replacement is `SELECT DISTINCT ON (trial_id) …
+   * ORDER BY trial_id, id DESC` over raw DBAL — DQL has no DISTINCT ON.
+   *
+   * @return array<int, Evaluation> Keyed by trial id.
+   */
+  public function findLatestByPersonIndexedByTrial(int $personId): array {
+    $rows = $this->createQueryBuilder('e')
+      ->andWhere('e.personId = :person')
+      ->andWhere('e.trialId IS NOT NULL')
+      ->setParameter('person', $personId)
+      ->orderBy('e.id', 'ASC')
+      ->getQuery()
+      ->getResult();
+
+    $latest = [];
+    foreach ($rows as $evaluation) {
+      $latest[$evaluation->getTrialId()] = $evaluation;
+    }
+
+    return $latest;
+  }
+
+  /**
    * An in-flight (pending or running) evaluation for this patient × trial, if
    * one exists.
    *

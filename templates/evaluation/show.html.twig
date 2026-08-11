@@ -21,6 +21,24 @@
     <span class="badge badge--{{ evaluation.status.value }}">{{ evaluation.status.label }}</span>
   </h1>
 
+  {#
+    ── The evaluator review layer ───────────────────────────────────────────
+    Three pieces, in three places, for three different reasons:
+
+      here      the tally — what everyone concluded, above the detail, because
+                whether humans trusted this result changes how you read it;
+      bottom    the form — you record a verdict AFTER reading the breakdown,
+                not before;
+      bottom    the comments — the reasoning behind the tally, for whoever
+                reads this next.
+
+    `can_review` is worked out once and passed to both partials, so the answer
+    cannot differ between the banner's "be the first" link and whether the form
+    it points at actually exists.
+  #}
+  {% set can_review = is_granted('CAN_REVIEW_EVALUATIONS') %}
+  {% include '@LuminaUi/evaluation/_review_summary.html.twig' %}
+
   <div class="actions">
     <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_json', {id: evaluation.id}) }}">View JSON</a>
     <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: evaluation.id}) }}">
@@ -169,4 +187,19 @@
     <h2>Command</h2>
     <pre>{{ evaluation.command }}</pre>
   {% endif %}
+
+  {#
+    The review layer's other two pieces. The form comes first because it is the
+    thing to act on having just read the breakdown above; the existing comments
+    follow as the record.
+
+    The form is gated on the permission, the comments are not: anyone who can
+    open this page (CAN_ACCESS_EVALUATIONS) should be able to read what
+    evaluators concluded, even if a future read-only role cannot add to it.
+  #}
+  {% if can_review %}
+    {% include '@LuminaUi/evaluation/_review_form.html.twig' %}
+  {% endif %}
+
+  {% include '@LuminaUi/evaluation/_review_comments.html.twig' %}
 {% endblock %}

@@ -1,0 +1,70 @@
+{#
+  Every evaluator's verdict and comment, at the bottom of an evaluation.
+
+  Expects:
+    reviews  — EvaluationReview[] from findForEvaluation(), newest activity first
+    myReview — this user's own, so theirs can be marked as such
+
+  ── Why reviews WITHOUT a comment still appear ─────────────────────────────
+  The heading says "comments", but a verdict recorded with no prose is still
+  something a reader needs to see: a list that quietly dropped them would not
+  add up to the tally in the banner at the top, and "2 agree" next to a list
+  showing one entry reads as a bug. The verdict is the record; the comment is
+  an optional annotation on it.
+
+  ── Why <article> and not <li> ─────────────────────────────────────────────
+  Each entry is independently meaningful — attribution, verdict, reason, prose,
+  timestamp — which is exactly what <article> is for, and it gives screen
+  reader users something to navigate between. The <h3> inside each keeps the
+  document outline going h1 (evaluation) → h2 (this section) → h3 (one review)
+  without a level being skipped.
+#}
+<section class="review-list" aria-labelledby="review-comments-heading">
+  <h2 id="review-comments-heading">Evaluator comments ({{ reviews|length }})</h2>
+
+  {% if reviews is empty %}
+    <p class="muted">Nobody has reviewed this evaluation yet.</p>
+  {% else %}
+    {% for review in reviews %}
+      {% set mine = myReview and myReview.id == review.id %}
+      <article class="review{{ mine ? ' review--mine' : '' }}">
+        <h3 class="review-byline">
+          {{ review.reviewer.displayName }}
+          {% if mine %}<span class="muted">(you)</span>{% endif %}
+          {#
+            The badge repeats what the text beside it already says. The colour is
+            never the message: "Agree" and "Disagree" are unmistakable words, and
+            green-vs-red is the one pairing guaranteed to collapse for a reader
+            with deuteranopia — the same reasoning as the match-count tiles.
+          #}
+          <span class="badge badge--{{ review.verdict.value }}">{{ review.verdict.shortLabel }}</span>
+        </h3>
+
+        {#
+          <time> with a machine-readable datetime, so the date is available to
+          anything parsing the page rather than only to a human reading it.
+          recordedAt is "updated if edited, otherwise created" — see the entity.
+        #}
+        <p class="review-meta muted">
+          <time datetime="{{ review.recordedAt|date('c') }}">{{ review.recordedAt|date('Y-m-d H:i') }}</time>
+          {%- if review.wasEdited %} · edited{% endif %}
+          {%- if review.reasonLabel %} · Reason: {{ review.reasonLabel }}
+          {%- elseif review.verdict.requiresReason %} · <span class="muted">reason no longer available</span>
+          {%- endif %}
+        </p>
+
+        {#
+          Twig autoescapes, so the comment cannot inject markup. nl2br is applied
+          because evaluators type line breaks and HTML would otherwise collapse
+          them into one paragraph — it runs AFTER escaping, which is the safe
+          order and the one Twig's filter chain gives us for free here.
+        #}
+        {% if review.hasComments %}
+          <p class="review-comment">{{ review.comments|nl2br }}</p>
+        {% else %}
+          <p class="review-comment muted">No comment given.</p>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% endif %}
+</section>

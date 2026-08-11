@@ -1,0 +1,83 @@
+{#
+  Admin: every evaluator review in the system.
+
+  On the control panel layout, filling {% block content %} — the hole the layout
+  leaves for a page. The left-hand nav now carries the cross-links that used to
+  be buttons at the top of this page, so they are not repeated here.
+#}
+{% extends '@LuminaUi/admin/layout.html.twig' %}
+{% block admin_page_title %}Evaluator Reviews{% endblock %}
+
+{% block content %}
+  <p class="muted">
+    {{ total }} review{{ total == 1 ? '' : 's' }} recorded across all evaluations,
+    most recently updated first.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Every agree/disagree verdict an evaluator has recorded, with the reason and comments they gave.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Evaluation</th>
+          <th scope="col">Patient</th>
+          <th scope="col">Reviewer</th>
+          <th scope="col">Verdict</th>
+          <th scope="col">Reason</th>
+          <th scope="col">Comments</th>
+          <th scope="col">Recorded</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for review in reviews %}
+          <tr>
+            <td>
+              <a href="{{ path('lumina_ui_evaluation_show', {id: review.evaluation.id}) }}#review">
+                #{{ review.evaluation.id }}
+              </a>
+            </td>
+            {# patientName is nullable — the parser only fills it when the command
+               reported one — so the person id is the reliable fallback. #}
+            <td>{{ review.evaluation.patientName ?? ('patient ' ~ review.evaluation.personId) }}</td>
+            <td>{{ review.reviewer.displayName }}</td>
+            <td><span class="badge badge--{{ review.verdict.value }}">{{ review.verdict.shortLabel }}</span></td>
+            <td>
+              {%- if review.reasonLabel -%}
+                {{ review.reasonLabel }}
+              {%- elseif review.verdict.requiresReason -%}
+                <span class="muted">reason no longer available</span>
+              {%- else -%}
+                <span class="muted">—</span>
+              {%- endif -%}
+            </td>
+            <td>{{ review.hasComments ? review.comments : '—' }}</td>
+            <td>
+              <time datetime="{{ review.recordedAt|date('c') }}">{{ review.recordedAt|date('Y-m-d H:i') }}</time>
+              {%- if review.wasEdited %} <span class="muted">(edited)</span>{% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7">No evaluator has reviewed anything yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {#
+    Same pager shape as the evaluations index. The links are plain <a> elements
+    with a page query parameter, so they work without JavaScript and can be
+    bookmarked; aria-label spells out the destination because "Previous" on its
+    own is ambiguous when a screen reader reads it out of context.
+  #}
+  {% if pages > 1 %}
+    <nav class="pagination" aria-label="Review pages">
+      {% if page > 1 %}
+        <a href="{{ path('admin_reviews_list', {page: page - 1}) }}" aria-label="Previous page">&larr; Previous</a>
+      {% endif %}
+      <span>Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}
+        <a href="{{ path('admin_reviews_list', {page: page + 1}) }}" aria-label="Next page">Next &rarr;</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

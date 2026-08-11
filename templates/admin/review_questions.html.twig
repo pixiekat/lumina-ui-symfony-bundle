@@ -1,0 +1,152 @@
+{#
+  Admin: the reasons offered when an evaluator disagrees with an evaluation.
+
+  This is the screen that justifies the reasons being a table rather than an
+  enum — reword one here and the dropdown on every evaluation page changes with
+  no deploy.
+
+  ── One form per row, all on one page ──────────────────────────────────────
+  Each row is its own <form>, with its own CSRF token, posting to its own row.
+  That is more markup than a single big form, but it means a save touches
+  exactly the row it was submitted from: no accidental overwrite of a change
+  someone else made to a different reason in between. It also works with no
+  JavaScript at all — each row is a plain POST.
+#}
+{% extends '@LuminaUi/admin/layout.html.twig' %}
+{% block admin_page_title %}Disagreement Reasons{% endblock %}
+
+{% block content %}
+  <p class="muted">
+    These are the options in the “Why do you disagree?” dropdown on an evaluation.
+    Lower weights sort first. Deactivating a reason removes it from the dropdown
+    for new reviews; reviews that already cite it keep it. There is deliberately
+    no delete — see below.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Each row saves on its own. Order is by weight, lowest first.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Reason</th>
+          <th scope="col">Help text</th>
+          <th scope="col">Weight</th>
+          <th scope="col">Active</th>
+          <th scope="col">Used by</th>
+          <th scope="col"><span class="visually-hidden">Save</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for question in questions %}
+          <tr>
+            {#
+              Every input carries the row's id in its own id attribute, because a
+              <label for="..."> has to point at something unique on the page and
+              this table renders one "Reason" field per row. Without it, clicking
+              any label would focus the first row's input.
+
+              The labels themselves are visually hidden rather than absent: the
+              column header alone does NOT give a screen reader user the field's
+              name when they tab into it, and thirty identically-unnamed text
+              boxes are unusable.
+            #}
+            <td>
+              <form method="post"
+                    action="{{ path('admin_review_question_save', {id: question.id}) }}"
+                    id="reason-form-{{ question.id }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('review-question-' ~ question.id) }}">
+                <label class="visually-hidden" for="label-{{ question.id }}">Reason text</label>
+                <input type="text" id="label-{{ question.id }}" name="label"
+                       value="{{ question.label }}" size="40" required>
+              </form>
+            </td>
+            {#
+              The remaining cells' controls belong to the form in the first cell.
+              A <form> cannot span table cells (the HTML parser will not allow it),
+              so they are associated by the `form` attribute instead — which is
+              exactly what that attribute is for, and is supported everywhere that
+              matters. Without JavaScript, and without a single row of scripting,
+              one Save button submits the whole row.
+            #}
+            <td>
+              <label class="visually-hidden" for="description-{{ question.id }}">Help text</label>
+              <input type="text" id="description-{{ question.id }}" name="description"
+                     form="reason-form-{{ question.id }}"
+                     value="{{ question.description }}" size="40">
+            </td>
+            <td>
+              <label class="visually-hidden" for="weight-{{ question.id }}">Weight</label>
+              <input type="number" id="weight-{{ question.id }}" name="weight"
+                     form="reason-form-{{ question.id }}"
+                     value="{{ question.weight }}" step="10" style="width:5rem">
+            </td>
+            <td>
+              <label class="visually-hidden" for="active-{{ question.id }}">Active</label>
+              <input type="checkbox" id="active-{{ question.id }}" name="active" value="1"
+                     form="reason-form-{{ question.id }}"
+                     {{ question.active ? 'checked' : '' }}>
+            </td>
+            <td>
+              {#
+                How many reviews cite this reason. The number that makes
+                "deactivate" an informed decision rather than a guess — and the
+                reason deleting is not offered, since a used reason is history.
+              #}
+              {% set used = usage[question.id] ?? 0 %}
+              {{ used }} review{{ used == 1 ? '' : 's' }}
+            </td>
+            <td>
+              {# Accessible name spelled out: a column of buttons all called
+                 "Save" tells a screen reader user nothing about which row. #}
+              <button type="submit" form="reason-form-{{ question.id }}">
+                Save<span class="visually-hidden"> “{{ question.displayLabel }}”</span>
+              </button>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">
+              No reasons defined — the “I disagree” option cannot be submitted until
+              at least one exists. Add one below.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Add a reason</h2>
+  <form method="post" action="{{ path('admin_review_question_add') }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('review-question-add') }}">
+
+    <div class="field">
+      <label for="new-label">Reason text</label>
+      <input type="text" id="new-label" name="label" required
+             aria-describedby="new-label-help">
+      <p id="new-label-help" class="muted field-help">
+        What an evaluator picks from the dropdown, e.g. “The patient data used is wrong”.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="new-description">Help text <span class="muted">(optional)</span></label>
+      <input type="text" id="new-description" name="description"
+             aria-describedby="new-description-help">
+      <p id="new-description-help" class="muted field-help">
+        Shown under the dropdown in the “What these reasons mean” panel.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="new-weight">Weight</label>
+      <input type="number" id="new-weight" name="weight" value="30" step="10" style="width:6rem"
+             aria-describedby="new-weight-help">
+      <p id="new-weight-help" class="muted field-help">
+        Lower sorts first. The seeded reasons use 0, 10 and 20, leaving gaps to
+        insert between them without renumbering.
+      </p>
+    </div>
+
+    <button type="submit">Add reason</button>
+  </form>
+{% endblock %}

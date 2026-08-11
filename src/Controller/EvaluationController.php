@@ -14,6 +14,8 @@ use Pixiekat\LuminaUiBundle\Message\RunBatch;
 use Pixiekat\LuminaUiBundle\Message\RunEvaluation;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationBatchRepository;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationRepository;
+use Pixiekat\LuminaUiBundle\Repository\EvaluationReviewRepository;
+use Pixiekat\LuminaUiBundle\Repository\ReviewQuestionRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

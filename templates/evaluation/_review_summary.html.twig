@@ -1,0 +1,64 @@
+{#
+  The evaluator review banner, shown at the top of an evaluation.
+
+  Expects:
+    tally    — {agree, disagree, total} from EvaluationReviewRepository::tallyFor
+    myReview — the current user's own EvaluationReview, or null
+    can_review — whether this user may record one (drives the "add yours" link)
+
+  ── Why this sits UNDER the <h1> and not above it ──────────────────────────
+  "At the top" and "before the heading" are not the same thing. A section
+  heading that appears before the page's <h1> makes the document outline start
+  at level 2 and jump backwards, which is exactly the pattern screen reader
+  users navigating by heading rely on being sensible. Placed immediately after
+  the <h1> it is still the first thing on the page after the title — visually
+  the top — while the outline stays h1 → h2.
+
+  ── Why the numbers are text and not a chart ───────────────────────────────
+  Same reasoning as the match-count tiles further down the page: two integers
+  and a total do not need an axis. A stacked bar here would also imply a
+  proportion that three reviews cannot support.
+#}
+<section class="review-summary" aria-labelledby="review-summary-heading">
+  <h2 id="review-summary-heading">Evaluator review</h2>
+
+  {% if tally.total == 0 %}
+    <p class="muted">
+      No evaluator has reviewed this evaluation yet.
+      {% if can_review %}<a href="#review">Be the first</a>.{% endif %}
+    </p>
+  {% else %}
+    {#
+      One sentence first, then the badges. The sentence is what a screen reader
+      reads out as a unit and what someone skimming actually needs; the badges
+      repeat it for people scanning visually. Neither carries meaning the other
+      lacks — the counts are spelled out in both.
+    #}
+    <p class="review-tally">
+      <strong>{{ tally.total }}</strong> evaluator{{ tally.total == 1 ? '' : 's' }}
+      reviewed this evaluation:
+      <span class="badge badge--agree">{{ tally.agree }} agree</span>
+      <span class="badge badge--disagree">{{ tally.disagree }} disagree</span>
+    </p>
+  {% endif %}
+
+  {#
+    Your own verdict, echoed back. Worth its own line rather than being folded
+    into the tally: "2 agree" does not tell you whether you were one of them,
+    and the most common reason to reopen an evaluation you have already reviewed
+    is to check or change what you said.
+  #}
+  {% if myReview %}
+    <p class="review-mine">
+      <span class="badge badge--{{ myReview.verdict.value }}">You: {{ myReview.verdict.shortLabel }}</span>
+      {% if myReview.reasonLabel %}
+        <span class="muted">— {{ myReview.reasonLabel }}</span>
+      {% endif %}
+      <a href="#review">Change your review</a>
+    </p>
+  {% elseif can_review and tally.total > 0 %}
+    <p class="review-mine">
+      <a href="#review">Record your own review</a>
+    </p>
+  {% endif %}
+</section>

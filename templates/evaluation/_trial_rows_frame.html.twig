@@ -26,7 +26,11 @@
 <turbo-frame id="evaluation-rows"
              target="_top"
              data-controller="evaluation-poll"
-             data-evaluation-poll-url-value="{{ path('lumina_ui_evaluation_new_by_patient_rows', {patient: patient.personId}) }}"
+             {# `match` travels with the poll URL so a refresh re-asks the SAME
+                question. Without it the table would quietly repopulate from a
+                different filter on the next tick, with nothing on screen to
+                explain why the row count changed. #}
+             data-evaluation-poll-url-value="{{ path('lumina_ui_evaluation_new_by_patient_rows', {patient: patient.personId, match: matchFilter.value}) }}"
              data-evaluation-poll-interval-value="5000">
   {% include '@LuminaUi/evaluation/_trial_rows.html.twig' %}
 </turbo-frame>

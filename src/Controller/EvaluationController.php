@@ -9,8 +9,11 @@ use Pixiekat\LuminaUiBundle\Entity\EvaluationBatch;
 use Pixiekat\LuminaUiBundle\Entity\User;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationKind;
 use Pixiekat\LuminaUiBundle\Enum\EvaluationStatus;
+use Pixiekat\LuminaUiBundle\Enum\MatchFilter;
 use Pixiekat\LuminaUiBundle\Enum\MatchingSoftware;
+use Pixiekat\LuminaUiBundle\Exception\TrialMatchingUnavailableException;
 use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
+use Pixiekat\LuminaUiBundle\ReadModel\TrialMatch;
 use Pixiekat\LuminaUiBundle\Message\RunBatch;
 use Pixiekat\LuminaUiBundle\Message\RunEvaluation;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationBatchRepository;
@@ -23,6 +26,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -48,7 +52,53 @@ class EvaluationController extends AbstractController {
     private readonly MessageBusInterface $bus,
     private readonly PixieInterfaces\Service\PatientManagerInterface $patientManager,
     private readonly PixieInterfaces\Service\TrialsManagerInterface $trialManager,
+    private readonly AuditLogManager $auditLog,
+    // EXACT's matching engine. Distinct from $trialManager on purpose: that one
+    // reads the trials DATABASE and answers "what is trial 44842", this one
+    // calls the HTTP API and answers "which trials suit person 107". They fail
+    // differently, so they are separate dependencies — see TrialMatcherInterface.
+    private readonly PixieInterfaces\Service\TrialMatcherInterface $trialMatcher,
+    private readonly LoggerInterface $logger,
+    /**
+     * The default match filter, from EXACT_MATCH_FILTER.
+     *
+     * A string rather than a MatchFilter because env vars are strings and the
+     * container resolves them before the enum exists. It is parsed — safely,
+     * falling back to the default — in matchFilter() below, which means a typo
+     * in .env degrades to the safe policy instead of a container-level crash on
+     * every page of the app.
+     */
+    #[Autowire('%env(string:EXACT_MATCH_FILTER)%')]
+    private readonly string $defaultMatchFilter = '',
   ) {}
+
+  /**
+   * The match filter for this request: query string first, then .env, then the
+   * safe default.
+   *
+   * ── Why the query string wins ───────────────────────────────────────────────
+   * The env var sets the policy; the query string is for looking. Putting the
+   * override in the URL means a particular view is bookmarkable, linkable and
+   * back-buttonable — the same argument the two evaluation flows make for having
+   * separate routes rather than a mode flag. It also makes the comparison
+   * immediate: three links, three counts, no settings round-trip and no server
+   * restart between them.
+   *
+   * Nothing here writes, so there is no CSRF consideration and no reason to make
+   * it a form. A GET that changes only what you are looking at is exactly what a
+   * query string is for.
+   */
+  private function matchFilter(Request $request): MatchFilter {
+    $requested = $request->query->get('match');
+
+    // '' from an unset env var is not a value; fall through to the enum default
+    // rather than parsing an empty string.
+    return MatchFilter::fromRequest(
+      is_string($requested) && $requested !== ''
+        ? $requested
+        : ($this->defaultMatchFilter !== '' ? $this->defaultMatchFilter : null),
+    );
+  }
 
   /** The landing page: a paginated table of standalone evaluations. */
   #[Route('/evaluations', name: 'lumina_ui_evaluation_index', methods: ['GET'])]
@@ -165,9 +215,16 @@ class EvaluationController extends AbstractController {
       return $this->redirectToRoute('lumina_ui_evaluation_new_by_patient');
     }
 
+    $filter = $this->matchFilter($request);
+
     return $this->render('@LuminaUi/evaluation/new_by_patient.html.twig', [
       'patient' => $patient,
-    ] + $this->trialQueueData($patient->personId));
+      'matchFilter' => $filter,
+      // Every case, so the template can render the toggle without knowing the
+      // vocabulary. Enum::cases() keeps the control in sync with the enum for
+      // free if a fourth position is ever added.
+      'matchFilters' => MatchFilter::cases(),
+    ] + $this->trialQueueData($patient->personId, $filter));
   }
 
   /**
@@ -187,9 +244,17 @@ class EvaluationController extends AbstractController {
       throw $this->createNotFoundException(sprintf('Patient #%d not found.', $personId));
     }
 
+    // The poller must ask the SAME question the page asked, or a refresh would
+    // silently swap the filter out from under the user — the table would repopulate
+    // with a different trial set and nothing on screen would explain why. The
+    // frame's poll URL carries `match` for exactly this reason.
+    $filter = $this->matchFilter($request);
+
     return $this->render('@LuminaUi/evaluation/_trial_rows_frame.html.twig', [
       'patient' => $patient,
-    ] + $this->trialQueueData($patient->personId));
+      'matchFilter' => $filter,
+      'matchFilters' => MatchFilter::cases(),
+    ] + $this->trialQueueData($patient->personId, $filter));
   }
 
   /**
@@ -724,8 +789,8 @@ class EvaluationController extends AbstractController {
    *
    * @return array<string, mixed>
    */
-  private function trialQueueData(int $personId): array {
-    $trials = $this->trialManager->findAll();
+  private function trialQueueData(int $personId, MatchFilter $filter): array {
+    [$trials, $matches, $matchingFailed] = $this->candidateTrials($personId, $filter);
     $latest = $this->evaluations->findLatestByPersonIndexedByTrial($personId);
 
     // Counts for the summary line above the table, and the seed for the
@@ -757,7 +822,98 @@ class EvaluationController extends AbstractController {
       'counts' => $counts,
       'remaining' => $remaining,
       'hasActive' => $counts['active'] > 0,
+      // Match data for the row template. Keyed by trial id, so a row renders its
+      // badge with `matches[trial.id]` and gets null for a trial EXACT said
+      // nothing about — which is every trial when matching is unavailable.
+      'matches' => $matches,
+      // Drives the "showing all trials, unranked" warning. A boolean rather than
+      // `matches is empty`, because those are different states: no matches is a
+      // real answer, matching being unavailable is not.
+      'matchingFailed' => $matchingFailed,
+      // NOTE: there is deliberately no "of N trials considered" figure here.
+      // EXACT's itemsTotalCount reports the MATCHED total once a profile is
+      // attached, so the corpus size would need either a second profile-less
+      // request or TrialsManager::countAll() — which is still a TODO in that
+      // class. A caption that says "92 matching trials" is true today; one that
+      // says "92 of 367" would need a number we do not currently have, and
+      // guessing it from findAll() would mean loading every row to print an
+      // integer. Implement countAll() and this becomes a one-line addition.
     ];
+  }
+
+  /**
+   * The trials to show for one patient: EXACT's candidate set when matching
+   * works, the whole corpus when it does not.
+   *
+   * ── Why the descriptive data still comes from the database ──────────────────
+   * EXACT's response carries titles, phases and sponsors, so it is tempting to
+   * render straight from it and skip this second lookup. That would put a second
+   * source of truth for "what is trial 44842" behind a network call, and the two
+   * would disagree the moment either side re-imported. Instead the matcher gives
+   * us an ORDER and a VERDICT — a list of trial ids, best first — and
+   * TrialsManager::findMany() gives us the facts, in one query.
+   *
+   * The reordering afterwards is the fiddly part and worth reading closely:
+   * findMany() returns rows keyed by id but in whatever order the database chose,
+   * so iterating it directly would silently discard EXACT's ranking. Walking the
+   * MATCH array and pulling each trial out by key preserves best-first, and drops
+   * any id EXACT knows about that our trials database does not — which happens,
+   * because EXACT serves `ne_bc_trials` (367 trials) while TRIALS_DATABASE_URL
+   * may point at `exactdb` (180). A trial we cannot describe is one we cannot
+   * queue, so dropping it is right; it is logged rather than silent.
+   *
+   * ── The failure path is the interesting one ────────────────────────────────
+   * On TrialMatchingUnavailableException we fall back to the full unranked list
+   * and flash a warning. That combination is deliberate: the list stays usable,
+   * and it announces that it is NOT ranked. The alternative — an empty table —
+   * would be read as "no trials suit this patient", which is a clinical claim we
+   * would be making on the strength of a network error.
+   *
+   * @return array{0: array<int, \Pixiekat\LuminaUiBundle\ReadModel\Trial>, 1: array<int, TrialMatch>, 2: bool}
+   */
+  private function candidateTrials(int $personId, MatchFilter $filter): array {
+    try {
+      $matches = $this->trialMatcher->matchForPatient($personId, $filter->statuses());
+    }
+    catch (TrialMatchingUnavailableException $e) {
+      // The message names the cause — bad token, unreachable host, no clinical
+      // record — so the clinician sees WHY the list is unranked rather than a
+      // generic apology. It never contains patient data; see the exception.
+      $this->addFlash('warning', sprintf(
+        'Trial matching is unavailable, so every trial is listed below, unranked. (%s)',
+        $e->getMessage(),
+      ));
+
+      return [$this->trialManager->findAll(), [], TRUE];
+    }
+
+    // Order comes from $matches, facts come from the database. See above.
+    $described = $this->trialManager->findMany(array_keys($matches));
+
+    $trials = [];
+    $undescribed = [];
+
+    foreach ($matches as $trialId => $match) {
+      if (isset($described[$trialId])) {
+        $trials[$trialId] = $described[$trialId];
+      }
+      else {
+        $undescribed[] = $trialId;
+      }
+    }
+
+    if ($undescribed !== []) {
+      // Almost always the two-databases problem in TrialsManager's docblock.
+      $this->logger->warning(
+        'EXACT matched {count} trial(s) that are not in the trials database — check TRIALS_DATABASE_URL. Ids: {ids}',
+        [
+          'count' => count($undescribed),
+          'ids' => implode(', ', array_slice($undescribed, 0, 20)),
+        ],
+      );
+    }
+
+    return [$trials, $matches, FALSE];
   }
 
   /**

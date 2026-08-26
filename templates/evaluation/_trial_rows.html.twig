@@ -31,6 +31,46 @@
   attributes, so a flag on the wrapper would freeze at its first-render value and
   the loop would never terminate.
 #}
+{#
+  ── The match filter toggle ───────────────────────────────────────────────────
+  Plain links, not a <select> with an onchange handler: three GETs to the same
+  screen. That means it works with JavaScript off, each position is bookmarkable
+  and back-buttonable, and there is no form to submit. A GET that changes only
+  what you are looking at is exactly what a query string is for.
+
+  Marked up as a nav with aria-current on the active position, so a screen reader
+  announces which of the three is in effect rather than reading three
+  indistinguishable links.
+
+  NOTE (2026-08-26): EXACT's ?type= parameter is currently inert on this
+  deployment — all three positions return identical trial sets and every result
+  is labelled "eligible". The control is correct against the documented contract
+  and will start discriminating once the marker tables are restored upstream.
+  Three identical counts is the symptom; three different counts is the all-clear.
+#}
+{% if not matchingFailed %}
+  <nav class="match-filter" aria-label="Match filter">
+    <span class="muted" id="match-filter-label">Show:</span>
+    <ul aria-labelledby="match-filter-label">
+      {% for option in matchFilters %}
+        <li>
+          {% if option == matchFilter %}
+            {# The current position is not a link — there is nowhere to go. #}
+            <strong aria-current="true">{{ option.label }}</strong>
+          {% else %}
+            <a href="{{ path('lumina_ui_evaluation_new_by_patient', {patient: patient.personId, match: option.value}) }}"
+               title="{{ option.description }}">{{ option.label }}</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {# The explanation of the ACTIVE position, always visible. `title` alone is
+       unreachable by keyboard and unreliable on touch, so it is a supplement
+       here and never the only copy of this text. #}
+    <p class="muted">{{ matchFilter.description }}</p>
+  </nav>
+{% endif %}
+
 <div class="status-summary"
      data-evaluation-poll-target="state"
      data-active="{{ hasActive ? 'true' : 'false' }}">
@@ -76,21 +116,72 @@
 </div>
 
 {% if trials is empty %}
-  <p class="muted">
-    No trials found. Check that the trials database is reachable and that
-    <code>TRIALS_DATABASE_URL</code> points at the right database.
-  </p>
+  {#
+    Three genuinely different reasons the table can be empty, and telling them
+    apart is the whole point of this block.
+
+    A blank table on a screen headed "queue this patient against trials" gets
+    read as a clinical statement — "nothing here suits this patient". That is
+    only ONE of the three cases, and it is the only one where the reading is
+    correct. Saying "No trials found" for all three would put a finding on
+    screen that we did not make, twice out of three times.
+
+    Ordered most-informative first, because `matchingFailed` is the only case
+    where the trials list itself is untrustworthy.
+  #}
+  {% if matchingFailed %}
+    <p class="muted">
+      No trials found, and matching was unavailable — so this is a problem with
+      the trials database rather than a finding about this patient. Check that it
+      is reachable and that <code>TRIALS_DATABASE_URL</code> points at the right
+      database.
+    </p>
+  {% else %}
+    <p class="muted">
+      <strong>No matching trials.</strong>
+      EXACT compared {{ patient.displayName }} against every trial it holds and
+      none were a match.
+      {#
+        The overwhelmingly common cause, worth naming rather than leaving to be
+        rediscovered: the trials database is disease-specific. A myeloma patient
+        against a breast-cancer corpus correctly matches nothing, and that looks
+        identical to a broken integration unless the screen says so.
+      #}
+      {% if patient.disease %}
+        This patient's recorded condition is <strong>{{ patient.disease }}</strong> —
+        if the loaded trial set covers a different condition, no match is the
+        expected result.
+      {% endif %}
+    </p>
+  {% endif %}
 {% else %}
   <div class="table-wrap">
     <table>
       <caption>
-        {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }} ·
-        queue {{ patient.displayName }} against each one
+        {% if matchingFailed %}
+          {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }},
+          <strong>unranked</strong> — matching was unavailable, so this is every
+          trial rather than the ones that suit this patient ·
+          queue {{ patient.displayName }} against each one
+        {% else %}
+          {{ trials|length }} matching trial{{ trials|length == 1 ? '' : 's' }} for
+          {{ patient.displayName }}, best match first
+        {% endif %}
       </caption>
       <thead>
         <tr>
           <th scope="col">Study</th>
           <th scope="col">Title</th>
+          {#
+            The match column is omitted entirely when matching failed, rather
+            than rendered full of em dashes. An empty column implies the data
+            exists and is unknown per-row; the truth is that we never got any of
+            it, and the caption above says so once instead of 92 times.
+          #}
+          {% if not matchingFailed %}
+            {# Numeric, so right-aligned and sortable by eye down the column. #}
+            <th scope="col">Match</th>
+          {% endif %}
           <th scope="col">Phase</th>
           <th scope="col">Sponsor</th>
           <th scope="col">Status</th>
@@ -114,6 +205,66 @@
                substr() would. Same truncation as the trial picker. #}
             {% set title = trial.displayTitle %}
             <td>{{ title|length > 90 ? title|slice(0, 90) ~ '…' : title }}</td>
+
+            {% if not matchingFailed %}
+              {% set trialMatch = matches[trial.id] ?? null %}
+              <td class="match-cell">
+                {% if trialMatch is null %}
+                  <span class="muted">—</span>
+                {% else %}
+                  {#
+                    Score first — it is the number people scan down the column.
+                    Explicitly tested for null rather than using ?? or |default:
+                    matchScore is legitimately null when EXACT scored nothing,
+                    and 0 is a real score. `0 ?? '—'` would print 0 correctly but
+                    `0|default('—')` would print the dash, because 0 is falsy in
+                    Twig. That is the same class of bug as ECOG 0 rendering as an
+                    em dash, and it is why this is an `is null` test.
+                  #}
+                  {% if trialMatch.matchScore is not null %}
+                    <strong>{{ trialMatch.matchScore }}</strong><span class="visually-hidden"> out of 100</span>
+                  {% else %}
+                    <span class="muted">unscored</span>
+                  {% endif %}
+
+                  {#
+                    The verdict badge carries the WORD, not just a colour —
+                    colour alone fails for colour-blind users and in forced-colours
+                    mode. Same rule the evaluation status badge follows below.
+                  #}
+                  {% if trialMatch.matchingType %}
+                    <span class="badge badge--match-{{ trialMatch.matchingType.cssModifier }}">{{ trialMatch.matchingType.label }}</span>
+                  {% endif %}
+
+                  {#
+                    The actionable part of a "possible" match: what is missing
+                    from ctomop. Named rather than counted, because "needs ECOG"
+                    tells someone what to go and record while "3 gaps" does not.
+                    <details> keeps a long list from crowding the row, and is
+                    keyboard-operable with no JavaScript.
+                  #}
+                  {% if trialMatch.missingAttributeCount > 0 %}
+                    {% set missing = trialMatch.missingAttributeTitles %}
+                    <details class="match-gaps">
+                      <summary>
+                        {{ trialMatch.missingAttributeCount }} missing
+                        <span class="visually-hidden">
+                          patient attribute{{ trialMatch.missingAttributeCount == 1 ? '' : 's' }}
+                          for {{ trial.studyId ?? ('trial ' ~ trial.id) }}
+                        </span>
+                      </summary>
+                      <ul>
+                        {% for title in missing %}<li>{{ title }}</li>{% endfor %}
+                      </ul>
+                    </details>
+                  {% endif %}
+
+                  {% if trialMatch.distanceLabel %}
+                    <span class="muted">{{ trialMatch.distanceLabel }}</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+            {% endif %}
 
             <td>{{ trial.phaseLabel ?? '—' }}</td>
             <td>{{ trial.sponsorName ?? '—' }}</td>

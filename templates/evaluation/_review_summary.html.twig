@@ -19,46 +19,54 @@
   and a total do not need an axis. A stacked bar here would also imply a
   proportion that three reviews cannot support.
 #}
-<section class="review-summary" aria-labelledby="review-summary-heading">
-  <h2 id="review-summary-heading">Evaluator review</h2>
+{% if is_granted(constant('Pixiekat\\LuminaUIBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_VIEW_EVALUATION_SUMMARY')) %}
+  <section class="review-summary" aria-labelledby="review-summary-heading">
+    <h2 id="review-summary-heading">Evaluator review</h2>
 
-  {% if tally.total == 0 %}
-    <p class="muted">
-      No evaluator has reviewed this evaluation yet.
-      {% if can_review %}<a href="#review">Be the first</a>.{% endif %}
-    </p>
-  {% else %}
-    {#
-      One sentence first, then the badges. The sentence is what a screen reader
-      reads out as a unit and what someone skimming actually needs; the badges
-      repeat it for people scanning visually. Neither carries meaning the other
-      lacks — the counts are spelled out in both.
-    #}
-    <p class="review-tally">
-      <strong>{{ tally.total }}</strong> evaluator{{ tally.total == 1 ? '' : 's' }}
-      reviewed this evaluation:
-      <span class="badge badge--agree">{{ tally.agree }} agree</span>
-      <span class="badge badge--disagree">{{ tally.disagree }} disagree</span>
-    </p>
-  {% endif %}
-
-  {#
-    Your own verdict, echoed back. Worth its own line rather than being folded
-    into the tally: "2 agree" does not tell you whether you were one of them,
-    and the most common reason to reopen an evaluation you have already reviewed
-    is to check or change what you said.
-  #}
-  {% if myReview %}
-    <p class="review-mine">
-      <span class="badge badge--{{ myReview.verdict.value }}">You: {{ myReview.verdict.shortLabel }}</span>
-      {% if myReview.reasonLabel %}
-        <span class="muted">— {{ myReview.reasonLabel }}</span>
+    {% if tally.total == 0 %}
+      <p class="muted">
+        No evaluator has reviewed this evaluation yet.
+        {% if can_review %}<a href="#review">Be the first</a>.{% endif %}
+      </p>
+    {% else %}
+      {#
+        One sentence first, then the badges. The sentence is what a screen reader
+        reads out as a unit and what someone skimming actually needs; the badges
+        repeat it for people scanning visually. Neither carries meaning the other
+        lacks — the counts are spelled out in both.
+      #}
+      {% if myReview %}
+        <p class="review-tally">
+          <strong>{{ tally.total }}</strong> evaluator{{ tally.total == 1 ? '' : 's' }}
+          reviewed this evaluation:
+          <span class="badge badge--agree">{{ tally.agree }} agree</span>
+          <span class="badge badge--disagree">{{ tally.disagree }} disagree</span>
+        </p>
+      {% else %}
+        <p class="text-muted">Submit a review to see how other evaluators have weighed in.</p>
       {% endif %}
-      <a href="#review">Change your review</a>
-    </p>
-  {% elseif can_review and tally.total > 0 %}
-    <p class="review-mine">
-      <a href="#review">Record your own review</a>
-    </p>
-  {% endif %}
-</section>
+    {% endif %}
+
+    {#
+      Your own verdict, echoed back. Worth its own line rather than being folded
+      into the tally: "2 agree" does not tell you whether you were one of them,
+      and the most common reason to reopen an evaluation you have already reviewed
+      is to check or change what you said.
+    #}
+    {% if myReview %}
+      <p class="review-mine">
+        <span class="badge badge--{{ myReview.verdict.value }}">You: {{ myReview.verdict.shortLabel }}</span>
+        {% if myReview.reasonLabel %}
+          <span class="muted">— {{ myReview.reasonLabel }}</span>
+        {% endif %}
+        {% if is_granted(constant('Pixiekat\\LuminaUIBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_EDIT_EVALUATION_REVIEW')) %}
+          <a href="#review">Change your review</a>
+        {% endif %}
+      </p>
+    {% elseif can_review and tally.total > 0 %}
+      <p class="review-mine">
+        <a href="#review">Record your own review</a>
+      </p>
+    {% endif %}
+  </section>
+{% endif %}

@@ -8,6 +8,10 @@
 
 {% block title %}{% block page_title %}Lumina UI{% endblock %} · Lumina{% endblock %}
 
+{% block meta_tags %}
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+{% endblock %}
+
 {% block stylesheets %}
   {{ parent() }}
   <style>
@@ -35,6 +39,50 @@
     .badge--running   { background:#e6f0ff; border-color:#0b5fff; color:#003bb3; }
     .badge--completed { background:#e7f6ec; border-color:#1a8a44; color:#0c5a2b; }
     .badge--failed    { background:#fdeaea; border-color:#c0392b; color:#8a261b; }
+
+    /* ── EXACT trial matching ───────────────────────────────────────────────
+       Verdict badges on the patient-first trial table. Same rule as every other
+       badge here: the hue is a REDUNDANT cue. Each one spells out "Eligible" or
+       "Possible — data missing" in words, because eligible/possible is exactly
+       the green/amber pair that collapses to one colour under deuteranopia, and
+       because a badge that only means something in colour means nothing at all
+       in forced-colours mode.
+
+       Reusing the completed-green and pending-amber rather than inventing a new
+       pair: one palette across the screen is fewer distinctions for a reader to
+       learn, and "eligible" genuinely rhymes with "completed" as a good outcome. */
+    .badge--match-eligible     { background:#e7f6ec; border-color:#1a8a44; color:#0c5a2b; }
+    .badge--match-potential    { background:#fff7e6; border-color:#d9a300; color:#7a5b00; }
+    .badge--match-not-eligible { background:#fdeaea; border-color:#c0392b; color:#8a261b; }
+
+    /* The score column. tabular-nums is genuinely load-bearing here rather than
+       decorative: the whole point of a score column is scanning DOWN it, and
+       proportional digits make 94 and 11 different widths so the numbers stop
+       lining up. This is the case the .kpi-value comment above defers to. */
+    .match-cell { font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .match-cell strong { font-size:1.05rem; }
+    .match-cell .badge { margin-left:.35rem; }
+
+    /* Missing-attribute disclosure. <details> is keyboard-operable and works
+       with no JavaScript; the only styling it needs is to stop a long list of
+       gaps from stretching the row. */
+    .match-gaps { display:inline-block; margin-left:.35rem; font-size:.85rem; }
+    .match-gaps summary { cursor:pointer; color:var(--muted); }
+    .match-gaps ul { margin:.35rem 0 0; padding-left:1.1rem; white-space:normal;
+                     max-width:16rem; font-weight:normal; }
+
+    /* The three-position filter. A row of links, with the active one bold and
+       unlinked — no colour-only state, so it survives a high-contrast mode. */
+    .match-filter { margin:0 0 1rem; display:flex; flex-wrap:wrap;
+                    align-items:baseline; gap:.5rem; }
+    .match-filter ul { list-style:none; display:flex; flex-wrap:wrap; gap:.5rem;
+                       margin:0; padding:0; }
+    .match-filter li + li { border-left:1px solid var(--line); padding-left:.5rem; }
+    /* The active position. [aria-current] rather than a class, so the visual
+       state cannot drift out of sync with what a screen reader announces —
+       they are driven by the same attribute. */
+    .match-filter [aria-current] { color:var(--fg); }
+    .match-filter > p { flex-basis:100%; margin:.15rem 0 0; font-size:.9rem; }
     .flash { padding:.65rem 1rem; border:1px solid var(--line); border-radius:.4rem; margin:0 0 1rem; }
     .flash--success { background:#e7f6ec; border-color:#1a8a44; }
     .flash--error   { background:#fdeaea; border-color:#c0392b; }
@@ -136,18 +184,20 @@
                      flex-wrap:wrap; gap:.5rem; align-items:baseline; }
     .review-meta { font-size:.85rem; margin:0 0 .5rem; }
     .review-comment { margin:0; white-space:normal; }
+    header.header { border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; justify-content:space-between; }
+
   </style>
 {% endblock %}
 
 {% block body %}
   <a class="skip-link" href="#main">Skip to content</a>
-  <header>
+  <header class="header">
     <nav aria-label="Primary">
       <a href="{{ path('lumina_ui_trial_index') }}">Trials</a>
       <a href="{{ path('lumina_ui_patient_index') }}">Patients</a>
       <a href="{{ path('lumina_ui_evaluation_index') }}">Evaluations</a>
-      {% if constant('Pixiekat\\LuminaUiBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_ACCESS_ADMIN_PANEL') %}
-        <a href="{{ path('admin_index') }}">Admin</a>
+      {% if is_granted(constant('Pixiekat\\LuminaUiBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_ACCESS_ADMIN_PANEL')) %}
+        <a href="{{ path('pixiekat_symfony_helpers_admin_index') }}">Admin</a>
       {% endif %}
       {# <a href="{{ path('lumina_ui_batch_index') }}">Search Trials for Patient Eligibility</a> #}
       {#{% if exact_url is defined %}
@@ -157,6 +207,14 @@
         <a href="{{ ctomop_url }}" rel="noopener noreferrer" target="_blank">CTOMOP (external)</a>
       {% endif %}#}
     </nav>
+    {% if app.user %}
+      <p class="muted" style="text-align:right; margin:0 1rem 0 0;">
+        Logged in as {{ app.user.getDisplayName() }}
+        {% if is_granted(constant('Pixiekat\\LuminaUiBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_LOG_IN')) %}
+          — <a href="{{ path('pixiekat_symfony_helpers_logout') }}">Log out</a>
+        {% endif %}
+      </p>
+    {% endif %}
   </header>
   <main id="main">
     {% for label, messages in app.flashes(['success', 'error', 'info', 'danger']) %}

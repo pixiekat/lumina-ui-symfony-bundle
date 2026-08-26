@@ -25,18 +25,25 @@ class GenericVoter extends PixieHelperSecurity\Voter\BaseVoter implements Interf
       return false;
     }
 
-    if ($this->isSysAdmin()) {
+    $forceForAdmins = [self::CAN_EDIT_EVALUATION_REVIEW];
+
+    if ($this->isSysAdmin() && !in_array($attribute, $forceForAdmins)) {
       return true;
     }
 
     return match($attribute) {
-        self::CAN_ACCESS_EVALUATIONS => $this->security->isGranted('ROLE_EVALUATOR') || $this->security->isGranted('ROLE_ADMIN'),
-        self::CAN_RUN_EVALUATIONS => $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_ACCESS_EVALUATIONS => $this->security->isGranted('ROLE_USER'),
+        self::CAN_VIEW_EVALUATION_JSON => $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_RUN_EVALUATIONS => $this->security->isGranted('ROLE_EVALUATOR') || $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_DELETE_EVALUATIONS => $this->security->isGranted('ROLE_ADMIN'),
         // Recording a verdict is the evaluator's job by definition. Admins get it
         // too via the role hierarchy in security.yaml (ROLE_ADMIN → ROLE_EVALUATOR),
         // so the second check is redundant today — it is spelled out to match the
         // line above and to survive the hierarchy being rearranged.
         self::CAN_REVIEW_EVALUATIONS => $this->security->isGranted('ROLE_EVALUATOR') || $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_VIEW_EVALUATION_REVIEWS => $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_VIEW_EVALUATION_SUMMARY => $this->security->isGranted('ROLE_EVALUATOR') || $this->security->isGranted('ROLE_ADMIN'),
+        self::CAN_EDIT_EVALUATION_REVIEW => false, // For now, remove for everyone. In the future, we may want to allow evaluators to edit their own reviews, but for now, we will just disable this feature.
         self::CAN_ACCESS_ADMIN_PANEL => $this->security->isGranted('ROLE_ADMIN'),
         self::CAN_LOG_IN => $this->canLogIn($user),
         default => false,

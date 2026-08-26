@@ -25,11 +25,6 @@ final class AdminController extends AbstractController {
     private readonly UserPasswordHasherInterface $passwordHasher,
   ) {  }
 
-  #[Route('/', name: 'admin_index')]
-  public function index(): Response {
-    return $this->render('@LuminaUi/admin/admin_index.html.twig');
-  }
-
   #[Route('/users', name: 'admin_users_list')]
   public function listUsers(): Response {
     $users = $this->entityManager->getRepository(Entity\User::class)->findAll();

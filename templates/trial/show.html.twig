@@ -54,7 +54,9 @@
   </div>
 
   <div class="actions">
-    <a class="button" href="{{ path('lumina_ui_evaluation_new', {trial: trialId}) }}">Queue more patients</a>
+    {% if is_granted('CAN_RUN_EVALUATIONS') %}
+      <a class="button" href="{{ path('lumina_ui_evaluation_new', {trial: trialId}) }}">Queue more patients</a>
+    {% endif %}
     <a class="button button--secondary" href="{{ path('lumina_ui_trial_index') }}">Back to trials</a>
   </div>
 
@@ -120,9 +122,11 @@
               <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">
                 View Result<span class="visually-hidden"> for evaluation {{ e.id }}</span>
               </a>
-              · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
-                JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
-              </a>
+              {% if is_granted('CAN_VIEW_EVALUATION_JSON') %}
+                · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
+                  JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
+                </a>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}

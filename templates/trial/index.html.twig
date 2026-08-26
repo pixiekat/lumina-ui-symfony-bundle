@@ -20,8 +20,10 @@
 
   <div class="actions">
     <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_index') }}">All evaluations</a>
-    <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
-    <a class="button" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">New evaluation by patient first</a>
+    {% if is_granted('CAN_RUN_EVALUATIONS') %}
+      <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+      <a class="button" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">New evaluation by patient first</a>
+    {% endif %}
   </div>
 
   {% if total == 0 %}

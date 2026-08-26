@@ -40,11 +40,21 @@
   {% include '@LuminaUi/evaluation/_review_summary.html.twig' %}
 
   <div class="actions">
-    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_json', {id: evaluation.id}) }}">View JSON</a>
-    <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: evaluation.id}) }}">
-      <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ evaluation.id) }}">
-      <button type="submit">Re-run</button>
-    </form>
+    {% if is_granted('CAN_VIEW_EVALUATION_JSON') %}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_json', {id: evaluation.id}) }}">View JSON</a>
+    {% endif %}
+    {% if is_granted('CAN_DELETE_EVALUATIONS') %}
+      <form method="post" action="{{ path('lumina_ui_evaluation_delete', {id: evaluation.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('delete-evaluation') }}">
+        <button type="submit">Delete</button>
+      </form>
+    {% endif %}
+    {% if is_granted('CAN_RERUN_EVALUATIONS') %}
+      <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: evaluation.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ evaluation.id) }}">
+        <button type="submit">Re-run</button>
+      </form>
+    {% endif %}
   </div>
 
   <table>
@@ -175,7 +185,7 @@
     </div>
   {% endif %}
 
-  {% if evaluation.rawOutput %}
+  {% if is_granted('CAN_VIEW_EVALUATION_JSON') and evaluation.rawOutput %}
     <h2>Raw output</h2>
     <details>
       <summary>Show captured stdout</summary>
@@ -183,7 +193,7 @@
     </details>
   {% endif %}
 
-  {% if evaluation.command %}
+  {% if is_granted('CAN_VIEW_EVALUATION_JSON') and evaluation.command %}
     <h2>Command</h2>
     <pre>{{ evaluation.command }}</pre>
   {% endif %}

@@ -41,7 +41,7 @@
     {% if counts.queued == 0 %}
       No evaluations queued for this trial yet.
     {% else %}
-      {{ counts.queued }} of {{ patients|length }} patient{{ patients|length == 1 ? '' : 's' }} queued ·
+      {{ counts.queued }} of {{ patients|length }} patient{{ patients|length == 1 ? '' : 's' }} ran ·
       {{ counts.active }} in progress ·
       {{ counts.completed }} completed{% if counts.failed > 0 %} · {{ counts.failed }} failed{% endif %}.
     {% endif %}
@@ -62,7 +62,7 @@
       <input type="hidden" name="_token" value="{{ csrf_token('queue-all-' ~ trial.id) }}">
       <input type="hidden" name="trial_id" value="{{ trial.id }}">
       <button type="submit">
-        Queue all {{ remaining }} remaining patient{{ remaining == 1 ? '' : 's' }}
+        Run all {{ remaining }} remaining patient{{ remaining == 1 ? '' : 's' }}
       </button>
       {# The confirm() above is an enhancement, not a guard — with JavaScript off
          it simply does not fire and the form posts. The action is idempotent in
@@ -128,7 +128,7 @@
 
             <td>
               {% if evaluation is null %}
-                <span class="muted">Not queued</span>
+                <span class="muted">Not run</span>
               {% else %}
                 {# The badge carries the word, not just a colour — colour alone
                    fails for colour-blind users and in high-contrast modes. #}
@@ -159,7 +159,7 @@
                   <input type="hidden" name="trial_id" value="{{ trial.id }}">
                   <input type="hidden" name="person_id" value="{{ patient.personId }}">
                   <button type="submit">
-                    {{ evaluation is null ? 'Queue' : 'Re-run' }}
+                    {{ evaluation is null ? 'Run' : 'Re-run' }}
                     {# Thirty buttons all named "Queue" are impossible to tell
                        apart in a screen reader's element list. #}
                     <span class="visually-hidden">evaluation for {{ patient.displayName }}</span>
@@ -167,7 +167,7 @@
                 </form>
               {% else %}
                 <span class="muted">
-                  Queued
+                  Running
                   <span class="visually-hidden">— no action available for {{ patient.displayName }} while it runs</span>
                 </span>
               {% endif %}

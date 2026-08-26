@@ -41,9 +41,9 @@
   #}
   <p aria-live="polite" aria-atomic="true" class="muted">
     {% if counts.queued == 0 %}
-      No evaluations queued for this patient yet.
+      No evaluations run for this patient yet.
     {% else %}
-      {{ counts.queued }} of {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }} queued ·
+      {{ counts.queued }} of {{ trials|length }} trial{{ trials|length == 1 ? '' : 's' }} ran ·
       {{ counts.active }} in progress ·
       {{ counts.completed }} completed{% if counts.failed > 0 %} · {{ counts.failed }} failed{% endif %}.
     {% endif %}
@@ -64,7 +64,7 @@
       <input type="hidden" name="_token" value="{{ csrf_token('queue-all-patient-' ~ patient.personId) }}">
       <input type="hidden" name="person_id" value="{{ patient.personId }}">
       <button type="submit">
-        Queue all {{ remaining }} remaining trial{{ remaining == 1 ? '' : 's' }}
+        Run all {{ remaining }} remaining trial{{ remaining == 1 ? '' : 's' }}
       </button>
       {# The confirm() is an enhancement, not a guard — with JavaScript off it
          does not fire and the form posts. The action is idempotent in the ways
@@ -120,7 +120,7 @@
 
             <td>
               {% if evaluation is null %}
-                <span class="muted">Not queued</span>
+                <span class="muted">Not run</span>
               {% else %}
                 {# The badge carries the word, not just a colour — colour alone
                    fails for colour-blind users and in high-contrast modes. #}
@@ -153,7 +153,7 @@
                      the redirect and nothing else. #}
                   <input type="hidden" name="flow" value="patient">
                   <button type="submit">
-                    {{ evaluation is null ? 'Queue' : 'Re-run' }}
+                    {{ evaluation is null ? 'Run' : 'Re-run' }}
                     {# 180 buttons all named "Queue" are impossible to tell apart
                        in a screen reader's element list. #}
                     <span class="visually-hidden">evaluation against {{ trial.studyId ?? ('trial ' ~ trial.id) }}</span>
@@ -161,7 +161,7 @@
                 </form>
               {% else %}
                 <span class="muted">
-                  Queued
+                  Running
                   <span class="visually-hidden">— no action available for {{ trial.studyId ?? ('trial ' ~ trial.id) }} while it runs</span>
                 </span>
               {% endif %}

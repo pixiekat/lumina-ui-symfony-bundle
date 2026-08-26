@@ -19,13 +19,7 @@
 #}
 {% extends '@PixiekatSymfonyHelpers/admin/cp_layout.html.twig' %}
 
-{% set admin_nav_sections = [
-  {
-    label: 'Control Panel',
-    links: [
-      {route: 'admin_index', label: 'Home'},
-    ],
-  },
+{% set admin_nav_sections = helpers_admin_nav()|merge([
   {
     label: 'Users & Access',
     links: [
@@ -48,9 +42,9 @@
       {route: 'lumina_ui_patient_index', label: 'Patients'},
     ],
   },
-] %}
+]) %}
 
-{% block admin_brand %}Lumina Control Panel{% endblock %}
+{% block admin_brand %}Lumina Clinical Trials Control Panel{% endblock %}
 
 {% block admin_header_links %}
   {% if app.user %}

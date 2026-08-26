@@ -46,15 +46,21 @@
               <td><time datetime="{{ e.createdAt|date('c') }}">{{ e.createdAt|date('Y-m-d H:i') }}</time></td>
               <td>
                 <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">View</a>
-                · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">JSON</a>
-                <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: e.id}) }}" class="inline">
-                  <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ e.id) }}">
-                  · <button type="submit">Re-run</button>
-                </form>
-                <form method="post" action="{{ path('lumina_ui_evaluation_delete', {id: e.id}) }}" class="inline">
-                  <input type="hidden" name="_token" value="{{ csrf_token('delete-evaluation') }}">
-                  · <button type="submit" onclick="return confirm('Delete this evaluation?');">Delete</button>
-                </form>
+                {% if is_granted('CAN_VIEW_EVALUATION_JSON') %}
+                  · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">JSON</a>
+                {% endif %}
+                {% if is_granted('CAN_RUN_EVALUATIONS') %}
+                  · <form method="post" action="{{ path('lumina_ui_evaluation_rerun', {id: e.id}) }}" class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('rerun-' ~ e.id) }}">
+                    <button type="submit">Re-run</button>
+                  </form>
+                {% endif %}
+                {% if is_granted('CAN_DELETE_EVALUATIONS') %}
+                  · <form method="post" action="{{ path('lumina_ui_evaluation_delete', {id: e.id}) }}" class="inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete-evaluation') }}">
+                    <button type="submit" onclick="return confirm('Delete this evaluation?');">Delete</button>
+                  </form>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}

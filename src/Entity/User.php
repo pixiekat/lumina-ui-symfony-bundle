@@ -4,6 +4,7 @@ namespace Pixiekat\LuminaUiBundle\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 use Pixiekat\SymfonyHelpers\Traits\Entity as PixieTraits;
+use Pixiekat\SymfonyHelpers\Interfaces\Entity\HelpersUserInterface;
 use Scheb\TwoFactorBundle\Model\Email\TwoFactorInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -26,7 +27,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\HasLifecycleCallbacks]
 #[ORM\UniqueConstraint(name: 'users_email_unique', columns: ['email'])]
 #[ORM\RepositoryClass('Pixiekat\LuminaUiBundle\Repository\UserRepository')]
-class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFactorInterface {
+class User implements HelpersUserInterface, UserInterface, PasswordAuthenticatedUserInterface, TwoFactorInterface {
   use PixieTraits\EntityDisplayNameTrait;  // getDisplayName() from first/middle/last name or email
   use PixieTraits\EntityIdTrait;            // id + getId()
   use PixieTraits\EntityPasswordTrait;      // password column + getPassword()

@@ -17,6 +17,8 @@ use Pixiekat\LuminaUiBundle\Repository\EvaluationBatchRepository;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationRepository;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationReviewRepository;
 use Pixiekat\LuminaUiBundle\Repository\ReviewQuestionRepository;
+use Pixiekat\SymfonyHelpers\Services\AuditLogManager;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -65,6 +67,7 @@ class EvaluationController extends AbstractController {
   }
 
   /** Deletes an evaluation. */
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_DELETE_EVALUATIONS)]
   #[Route('/evaluations/{id}', name: 'lumina_ui_evaluation_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
   public function delete(int $id, Request $request): Response {
     $evaluation = $this->findEvaluationOr404($id);
@@ -88,6 +91,7 @@ class EvaluationController extends AbstractController {
    * @return Response
    * @throws \Doctrine\DBAL\Exception
    */
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   #[Route('/evaluations/new', name: 'lumina_ui_evaluation_new', methods: ['GET'])]
   public function new(Request $request): Response {
     // get trial from the query string, if any.
@@ -138,6 +142,7 @@ class EvaluationController extends AbstractController {
    * a difference in the interface and never a difference in behaviour.
    */
   #[Route('/evaluations/new/patient', name: 'lumina_ui_evaluation_new_by_patient', methods: ['GET'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function newByPatient(Request $request): Response {
     $personId = $request->query->getInt('patient');
 
@@ -173,6 +178,7 @@ class EvaluationController extends AbstractController {
    * nothing watching for a flash message on this endpoint.
    */
   #[Route('/evaluations/new/patient/rows', name: 'lumina_ui_evaluation_new_by_patient_rows', methods: ['GET'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function newByPatientRows(Request $request): Response {
     $personId = $request->query->getInt('patient');
     $patient = $personId > 0 ? $this->patientManager->find($personId) : null;
@@ -191,6 +197,7 @@ class EvaluationController extends AbstractController {
    *
    */
   #[Route('/evaluations/new/rows', name: 'lumina_ui_evaluation_new_rows', methods: ['GET'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function newRows(Request $request): Response {
     $trialId = $request->query->getInt('trial');
     $trial = $trialId > 0 ? $this->trialManager->find($trialId) : null;
@@ -214,6 +221,7 @@ class EvaluationController extends AbstractController {
    * @throws \Doctrine\DBAL\Exception
    */
   #[Route('/evaluations/queue', name: 'lumina_ui_evaluation_queue', methods: ['POST'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function queue(Request $request): Response {
     $trialId = (int) $request->request->get('trial_id');
     $personId = (int) $request->request->get('person_id');
@@ -261,6 +269,7 @@ class EvaluationController extends AbstractController {
     try {
       $this->em->persist($evaluation);
       $this->em->flush();
+      $this->auditLog->log('queue evaluation', $evaluation, ["trial" => $trialId, "patient" => $personId], true);
     }
     catch (UniqueConstraintViolationException) {
       // edge case where two requests try to queue the same patient at the same time. The first one wins, the second one gets this exception. We don't want to throw a 500 error, so we just show a flash message and send them back to the screen they posted from.
@@ -284,6 +293,7 @@ class EvaluationController extends AbstractController {
    * Queue every patient who has NO evaluation yet against this trial.
    */
   #[Route('/evaluations/queue-all', name: 'lumina_ui_evaluation_queue_all', methods: ['POST'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function queueAll(Request $request): Response {
     $trialId = (int) $request->request->get('trial_id');
 
@@ -336,6 +346,7 @@ class EvaluationController extends AbstractController {
     try {
       // persist the batch and all its evaluations in one transaction. If any of the evaluations already exist, the whole transaction will fail and we will catch the exception below.
       $this->em->flush();
+      $this->auditLog->log('queue all evaluations', $batch, ["trial" => $trial->id], true);
     }
     catch (UniqueConstraintViolationException) {
       // catch if someone queued the same patient at the same time to protect against 500 errors.
@@ -378,6 +389,7 @@ class EvaluationController extends AbstractController {
    * work, which is exactly the property the A/B comparison needs.
    */
   #[Route('/evaluations/queue-all-trials', name: 'lumina_ui_evaluation_queue_all_trials', methods: ['POST'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function queueAllTrials(Request $request): Response {
     $personId = (int) $request->request->get('person_id');
 
@@ -503,6 +515,7 @@ class EvaluationController extends AbstractController {
   }
 
   /** The explain breakdown as raw, pretty-printed JSON. */
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_VIEW_EVALUATION_JSON)]
   #[Route('/evaluations/{id}/json', name: 'lumina_ui_evaluation_json', methods: ['GET'], requirements: ['id' => '\d+'])]
   public function viewJson(int $id): JsonResponse {
     $evaluation = $this->findEvaluationOr404($id);
@@ -528,6 +541,7 @@ class EvaluationController extends AbstractController {
 
   /** Re-run: clone an existing evaluation into a fresh Pending row and queue it. */
   #[Route('/evaluations/{id}/rerun', name: 'lumina_ui_evaluation_rerun', methods: ['POST'], requirements: ['id' => '\d+'])]
+  #[IsGranted(PixieInterfaces\Security\Voter\GenericVoterInterface::CAN_RUN_EVALUATIONS)]
   public function rerun(int $id, Request $request): Response {
     $original = $this->findEvaluationOr404($id);
 

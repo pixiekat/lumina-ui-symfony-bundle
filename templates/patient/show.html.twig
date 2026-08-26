@@ -60,7 +60,9 @@
 
   <div class="actions">
     <a class="button button--secondary" href="{{ path('lumina_ui_patient_index') }}">Back to patients</a>
-    <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+    {% if is_granted('CAN_RUN_EVALUATIONS') %}
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+    {% endif %}
   </div>
 
   <div class="table-wrap">
@@ -158,9 +160,11 @@
               <a href="{{ path('lumina_ui_evaluation_show', {id: e.id}) }}">
                 View Result<span class="visually-hidden"> for evaluation {{ e.id }}</span>
               </a>
-              · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
-                Raw JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
-              </a>
+              {% if is_granted('CAN_VIEW_EVALUATION_JSON') %}
+                · <a href="{{ path('lumina_ui_evaluation_json', {id: e.id}) }}">
+                  Raw JSON<span class="visually-hidden"> for evaluation {{ e.id }}</span>
+                </a>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}

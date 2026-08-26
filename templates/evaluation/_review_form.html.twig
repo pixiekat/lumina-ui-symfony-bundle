@@ -36,92 +36,107 @@
     #}
     <p class="muted">
       You recorded this on {{ myReview.recordedAt|date('Y-m-d H:i') }}{% if myReview.wasEdited %} (edited){% endif %}.
-      Submitting again replaces it — each evaluator holds one review per evaluation.
+      {% if is_granted(constant('Pixiekat\\LuminaUIBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_EDIT_EVALUATION_REVIEW')) %}
+        Submitting again replaces it — each evaluator holds one review per evaluation.
+      {% endif %}
     </p>
   {% endif %}
 
-  <form method="post"
-        action="{{ path('lumina_ui_evaluation_review', {id: evaluation.id}) }}"
-        data-controller="review-form">
-    <input type="hidden" name="_token" value="{{ csrf_token('review-' ~ evaluation.id) }}">
+  {% set show_form = true %}
+  {# Only show form if they haven't submitted a review or can edit their review #}
+  {% if myReview and not is_granted(constant('Pixiekat\\LuminaUIBundle\\Interfaces\\Security\\Voter\\GenericVoterInterface::CAN_EDIT_EVALUATION_REVIEW')) %}
+    {% set show_form = false %}
+  {% endif %}
 
-    {#
-      A <fieldset> with a <legend> is what groups radios for assistive tech: it
-      is how "I agree with this evaluation" gets announced as an answer to
-      "Your verdict" rather than as a stray checkbox floating in the page.
-    #}
-    <fieldset class="review-verdict">
-      <legend>Your verdict</legend>
+  {% if show_form %}
 
-      {% for verdict in ['agree', 'disagree'] %}
-        {% set checked = myReview and myReview.verdict.value == verdict %}
-        <label class="review-option" for="verdict-{{ verdict }}">
-          <input type="radio"
-                 id="verdict-{{ verdict }}"
-                 name="verdict"
-                 value="{{ verdict }}"
-                 {{ checked ? 'checked' : '' }}
-                 required
-                 data-review-form-target="verdict"
-                 data-action="change->review-form#toggleReason">
-          {# The full first-person sentence, straight off the enum, so the
-             wording is identical here and in the comment list below. #}
-          <span>{{ verdict == 'agree' ? 'I agree with this evaluation' : 'I disagree with this evaluation' }}</span>
-        </label>
-      {% endfor %}
-    </fieldset>
+    <form method="post"
+          action="{{ path('lumina_ui_evaluation_review', {id: evaluation.id}) }}"
+          data-controller="review-form">
+      <input type="hidden" name="_token" value="{{ csrf_token('review-' ~ evaluation.id) }}">
 
-    {#
-      The reason. `hidden` is NOT set here — the server-rendered default is
-      visible, which is what makes the form usable without JavaScript. The
-      Stimulus controller hides it on connect when the state warrants it.
-    #}
-    <div class="field" data-review-form-target="reason">
-      <label for="review-question">Why do you disagree?</label>
-      <select id="review-question" name="question" aria-describedby="review-question-help">
-        <option value="">Choose a reason…</option>
-        {% for question in reviewQuestions %}
-          <option value="{{ question.id }}"
-                  {{ myReview and myReview.question and myReview.question.id == question.id ? 'selected' : '' }}>
-            {{ question.displayLabel }}
-          </option>
+      {#
+        A <fieldset> with a <legend> is what groups radios for assistive tech: it
+        is how "I agree with this evaluation" gets announced as an answer to
+        "Your verdict" rather than as a stray checkbox floating in the page.
+      #}
+      <fieldset class="review-verdict">
+        <legend>Your verdict</legend>
+
+        {% for verdict in ['agree', 'disagree'] %}
+          {% set checked = myReview and myReview.verdict.value == verdict %}
+          <label class="review-option" for="verdict-{{ verdict }}">
+            <input type="radio"
+                  id="verdict-{{ verdict }}"
+                  name="verdict"
+                  value="{{ verdict }}"
+                  {{ checked ? 'checked' : '' }}
+                  required
+                  data-review-form-target="verdict"
+                  data-action="change->review-form#toggleReason">
+            {# The full first-person sentence, straight off the enum, so the
+              wording is identical here and in the comment list below. #}
+            <span>{{ verdict == 'agree' ? 'I agree with this evaluation' : 'I disagree with this evaluation' }}</span>
+          </label>
         {% endfor %}
-      </select>
-      <p id="review-question-help" class="muted field-help">
-        Required when you disagree. Ignored if you agree.
-        {#
-          Descriptions are optional per reason and most will not have one, so
-          this only renders when there is something to say. Shown for ALL of
-          them rather than only the selected one because, with no JavaScript,
-          there is no "selected one" until the form is submitted.
-        #}
-      </p>
-      {% set described = reviewQuestions|filter(q => q.description) %}
-      {% if described is not empty %}
-        <details class="review-reason-help">
-          <summary>What these reasons mean</summary>
-          <dl>
-            {% for question in described %}
-              <dt>{{ question.displayLabel }}</dt>
-              <dd>{{ question.description }}</dd>
-            {% endfor %}
-          </dl>
-        </details>
-      {% endif %}
-    </div>
+      </fieldset>
 
-    <div class="field">
-      <label for="review-comments">Brief comments <span class="muted">(optional)</span></label>
-      <textarea id="review-comments"
-                name="comments"
-                rows="3"
-                maxlength="2000"
-                aria-describedby="review-comments-help">{{ myReview ? myReview.comments : '' }}</textarea>
-      <p id="review-comments-help" class="muted field-help">
-        Shown to other evaluators at the bottom of this page, with your name.
-      </p>
-    </div>
+      {#
+        The reason. `hidden` is NOT set here — the server-rendered default is
+        visible, which is what makes the form usable without JavaScript. The
+        Stimulus controller hides it on connect when the state warrants it.
+      #}
+      <div class="field" data-review-form-target="reason">
+        <label for="review-question">Why do you disagree?</label>
+        <select id="review-question" name="question" aria-describedby="review-question-help">
+          <option value="">Choose a reason…</option>
+          {% for question in reviewQuestions %}
+            <option value="{{ question.id }}"
+                    {{ myReview and myReview.question and myReview.question.id == question.id ? 'selected' : '' }}>
+              {{ question.displayLabel }}
+            </option>
+          {% endfor %}
+        </select>
+        <p id="review-question-help" class="muted field-help">
+          Required when you disagree. Ignored if you agree.
+          {#
+            Descriptions are optional per reason and most will not have one, so
+            this only renders when there is something to say. Shown for ALL of
+            them rather than only the selected one because, with no JavaScript,
+            there is no "selected one" until the form is submitted.
+          #}
+        </p>
+        {% set described = reviewQuestions|filter(q => q.description) %}
+        {% if described is not empty %}
+          <details class="review-reason-help">
+            <summary>What these reasons mean</summary>
+            <dl>
+              {% for question in described %}
+                <dt>{{ question.displayLabel }}</dt>
+                <dd>{{ question.description }}</dd>
+              {% endfor %}
+            </dl>
+          </details>
+        {% endif %}
+      </div>
 
-    <button type="submit">{{ myReview ? 'Update my review' : 'Record my review' }}</button>
-  </form>
+      <div class="field">
+        <label for="review-comments">Brief comments <span class="muted">(optional)</span></label>
+        <textarea id="review-comments"
+                  name="comments"
+                  rows="3"
+                  maxlength="2000"
+                  aria-describedby="review-comments-help">{{ myReview ? myReview.comments : '' }}</textarea>
+        <p id="review-comments-help" class="muted field-help">
+          Shown to other evaluators at the bottom of this page, with your name.
+        </p>
+      </div>
+
+      <button type="submit">{{ myReview ? 'Update my review' : 'Record my review' }}</button>
+    </form>
+  {% else %}
+    <p class="muted">
+      You have already submitted a review for this evaluation. You do not have permission to edit it.
+    </p>
+  {% endif %}
 </section>

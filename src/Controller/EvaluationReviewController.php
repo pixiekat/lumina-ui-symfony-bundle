@@ -12,6 +12,7 @@ use Pixiekat\LuminaUiBundle\Interfaces as PixieInterfaces;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationRepository;
 use Pixiekat\LuminaUiBundle\Repository\EvaluationReviewRepository;
 use Pixiekat\LuminaUiBundle\Repository\ReviewQuestionRepository;
+use Pixiekat\SymfonyHelpers\Services\AuditLogManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -59,6 +60,7 @@ class EvaluationReviewController extends AbstractController {
     private readonly EvaluationReviewRepository $reviews,
     private readonly ReviewQuestionRepository $questions,
     private readonly EntityManagerInterface $em,
+    private readonly AuditLogManager $auditLog,
   ) {}
 
   /**
@@ -150,6 +152,7 @@ class EvaluationReviewController extends AbstractController {
       ->setComments($comments === '' ? null : $comments);
 
     try {
+      $this->auditLog->log("%actor% " . ($isNew ? 'created' : 'updated') . " the evaluation review %target%", $review, ["evaluation" => $evaluation->id()], true);
       $this->em->flush();
     }
     catch (UniqueConstraintViolationException) {

@@ -61,7 +61,7 @@
   <div class="actions">
     <a class="button button--secondary" href="{{ path('lumina_ui_patient_index') }}">Back to patients</a>
     {% if is_granted('CAN_RUN_EVALUATIONS') %}
-      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+      <a class="button button--secondary" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">New evaluation</a>
     {% endif %}
   </div>
 

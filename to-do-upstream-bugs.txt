@@ -1,0 +1,29 @@
+The key architectural call: ranking comes from the API, facts come from your database. matchForPatient() returns ordered trial ids; TrialsManager::findMany() supplies titles and sponsors. Your own Trial docblock says a read model should answer one question, so match data got its own model rather than bloating Trial.
+
+Three places the API contradicts its own documentation
+
+Worth passing to the creator — each one fails silently:
+
+1. The envelope key is patient_info, not the documented patientInfo. The documented key returns HTTP 200, all 367 trials, matchScore: null — a confident well-formed answer computed with no patient context. Inner keys work in either case; only the envelope is exempt from the camelCase middleware.
+2. count is the page count, not the item count. itemsTotalCount is the item count. Reading count — the field every DRF client reaches for — would have shown "5 trials" instead of 88.
+3. Verb asymmetry: /trials/match/ is POST-only (GET → 405), /trials/count/ is GET-only (POST → 405). Since the profile must travel in a body, counting has to go through the match endpoint.
+
+Two upstream bugs
+
+- trials_marker — you fixed this mid-session; the normalizer went 500 → 200 and now translates 18 fields ('Partial Response' → 'PR', 'Responsive' → 'notRefractory', plus lab-value fallbacks).
+- ?type= is still inert. I re-tested after your restore: all three values return byte-identical 88-trial sets, everything labelled eligible. Your toggle will show three identical counts today — that's the symptom, not a wiring mistake. Three different counts is the all-clear.
+
+Two things I got wrong, both caught by your testing
+
+- countForPatient() was built against POST /trials/count/, which is 405. Rewritten.
+- The dedup logged once per overlapping trial — ~90 INFO lines per page load, exactly as your log showed. Now one notice with a count, because "45 of 90" and "90 of 90" mean different things.
+
+Worth knowing
+
+Matching costs ~1.6–2.7s per page render (one HTTP call per status, plus normalize). Noticeable on a screen someone's waiting on — caching per patient is the obvious next move if it grates.
+
+Patient 9002 returning nothing is correct: myeloma against a breast-cancer corpus. The empty state now says so explicitly, naming the patient's condition, rather than leaving a blank table to read as a clinical finding.
+
+I left one TODO rather than guessing: DIRECT_IDENTIFIERS in the provider is a deny list, which fails open. An allow list needs a pass against EXACT's matcher to confirm which of the 279 columns it actually reads — guessing would silently drop real criteria. Stripping the current 15 changed the result by zero (92 trials, score 94, 48 criteria either way), so it costs nothing.
+
+Nothing committed — all yours to review.

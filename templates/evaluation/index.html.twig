@@ -7,7 +7,7 @@
   <p>A list of all evaluations that have been run. Evaluations are created by selecting a trial and then queuing a patient for evaluation. You can view all evaluations by trial by clicking <a href="{{ path('lumina_ui_trial_index') }}">here</a> and all evaluations by patient by clicking <a href="{{ path('lumina_ui_patient_index') }}">here</a>.</p>
 
   <div class="actions">
-    <a class="button" href="{{ path('lumina_ui_evaluation_new') }}">New evaluation</a>
+    <a class="button" href="{{ path('lumina_ui_evaluation_new_by_patient') }}">New evaluation</a>
     <form method="post" action="{{ path('lumina_ui_evaluation_run_all') }}"
           onsubmit="return confirm('Run a trial search for ALL patients in the background?');">
       <input type="hidden" name="_token" value="{{ csrf_token('run-all') }}">

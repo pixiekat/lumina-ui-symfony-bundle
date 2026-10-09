@@ -99,7 +99,7 @@ enum MatchFilter: string {
     return match ($this) {
       self::Eligible => 'Trials where every criterion we could check matched. Narrowest — trials blocked only by missing data are hidden.',
       self::Potential => 'Only trials blocked by missing patient data. Use this to see what recording more in ctomop would unlock.',
-      self::EligibleAndPotential => 'Confirmed fits plus trials where nothing ruled the patient out but some data is missing. The default.',
+      self::EligibleAndPotential => 'Both eligible and potential trials where nothing ruled the patient out but some data is missing. The default.',
     };
   }
 
